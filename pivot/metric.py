@@ -48,3 +48,13 @@ class Manhattan(Metric):
     def _calc_distance(self, a, b, is_list):
         axis = 1 if is_list else 0
         return np.sum(np.abs(a-b), axis=axis)
+
+class Minkowski(Metric):
+    def __init__(self, p):
+        self.p = p
+        super().__init__(r"\|.\|_"+p)
+
+    def _calc_distance(self, a, b, is_list):
+        axis = 1 if is_list else 0
+        sum_ = np.sum((a-b)**self.p, axis=axis)
+        return sum_**(1/self.p)
