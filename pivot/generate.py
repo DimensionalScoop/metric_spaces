@@ -2,7 +2,7 @@ import numpy as np
 
 
 def hyper_unit_grid(dimensions, samples):
-    """generate a gird with `samples` points between [-0.5, 0.5] in any dims"""
+    """generate a grid with `samples` points between [-0.5, 0.5] in any dims"""
     edge_length_in_samples = int(samples ** (1 / dimensions))
     _check_sample_size(edge_length_in_samples, dimensions)
     lin = np.linspace(-0.5, 0.5, edge_length_in_samples)
