@@ -26,7 +26,7 @@ class Metric:
 
 class Euclid(Metric):
     def __init__(self):
-        super().__init__(r"\|.\|_2")
+        super().__init__(r"\|\cdot\|_2")
 
     def _calc_distance(self, a, b, is_list):
         axis = 1 if is_list else 0
@@ -35,7 +35,7 @@ class Euclid(Metric):
 
 class Chebyshev(Metric):
     def __init__(self):
-        super().__init__(r"\|.\|_\infty")
+        super().__init__(r"\|\cdot\|_\infty")
 
     def _calc_distance(self, a, b, is_list):
         axis = 1 if is_list else 0
@@ -43,7 +43,7 @@ class Chebyshev(Metric):
 
 class Manhattan(Metric):
     def __init__(self):
-        super().__init__(r"\|.\|_1")
+        super().__init__(r"\|\cdot\|_1")
 
     def _calc_distance(self, a, b, is_list):
         axis = 1 if is_list else 0
@@ -52,7 +52,7 @@ class Manhattan(Metric):
 class Minkowski(Metric):
     def __init__(self, p):
         self.p = p
-        super().__init__(r"\|.\|_"+p)
+        super().__init__(r"\|\cdot\|_"+p)
 
     def _calc_distance(self, a, b, is_list):
         axis = 1 if is_list else 0
