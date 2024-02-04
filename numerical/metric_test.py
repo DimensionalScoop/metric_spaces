@@ -2,6 +2,7 @@
 
 import numpy as np
 from tqdm import tqdm
+from itertools import chain
 
 from joblib import Parallel, delayed
 
@@ -18,7 +19,20 @@ class MetricTest:
 
     def triangle_violation(self, x, y, z):
         d = self.d
-        return -(d(x, z) + d(z, y) - d(x, y))
+        xz = d(x, z)
+        xy = d(x, y)
+        yz = d(y, z)
+
+        # calculate all three possible triangles
+        max_violation = min(
+            [
+                xz + xy - yz,
+                xz - xy + yz,
+                -xz + xy + yz,
+            ]
+        )
+
+        return -max_violation
 
     def pto_violation(self, x, y, z, k):
         d = self.d
@@ -29,25 +43,24 @@ class MetricTest:
         return diff > self.atol and self.d(x, y) < self.atol
 
     def run_test(self, n_samples=10000, multicore=True):
-        # XXX: doesn't work yet
         n_jobs = 20 if multicore else 1
-        executor = Parallel(n_jobs=n_jobs)
-        job = delayed(self._run_test)(n_samples // n_jobs)
-        return executor(job)
+        executor = Parallel(n_jobs=n_jobs, verbose=3)
 
-    def _run_test(self, n_samples=1000, use_tqdm=True):
+        points = self.vector_generators_func(n_samples, 4)
+        jobs = [delayed(self._test_single)(*p) for p in points]
+        result = executor(jobs)
+        return list(chain.from_iterable(result)) 
+
+    def _test_single(self, x, y, z, k):
         messages = []
-        samples = tqdm(range(n_samples)) if use_tqdm else range(n_samples)
-        for _ in samples:
-            x, y, z, k = self.vector_generators_func(4)
-            try:
-                if self.triangle_violation(x, y, z) > self.atol:
-                    messages.append(("triangle violation", [x, y, z]))
-                if self.pto_violation(x, y, z, k) > 1e-3:
-                    messages.append(("pto violation", [x, y, z, k]))
-                if self.is_pseudo(x, y):
-                    messages.append(("distance 0", (x, y)))
-            except ValueError:
-                messages.append(("skipped", (x, y, z, k)))
+        try:
+            if self.triangle_violation(x, y, z) > self.atol:
+                messages.append(("triangle violation", [x, y, z]))
+            if self.pto_violation(x, y, z, k) > 1e-3:
+                messages.append(("pto violation", [x, y, z, k]))
+            if self.is_pseudo(x, y):
+                messages.append(("distance 0", (x, y)))
+        except ValueError:
+            messages.append(("skipped", (x, y, z, k)))
 
         return messages

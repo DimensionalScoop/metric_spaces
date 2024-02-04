@@ -21,7 +21,9 @@ import numpy.testing as npt
 import sys
 sys.path.append("/home/elayn/epix/metric_spaces/")
 
-from numerical.metric_test import MetricTest
+from numerical.metric_test import MetricTest, NoVarianceError
+
+# %%
 
 # %%
 def corr(x, y, ddof=1):
@@ -75,64 +77,66 @@ differences = np.asarray(dists["raw"]) - np.asarray(dists["no_mean"])
 npt.assert_almost_equal(differences, 0)
 
 # %%
-DIMS = 4
+DIMS = 15
 
-def generate_discrete_vecs(number):
-    return np.random.randint(-20, 20, size=[number, DIMS])
+def generate_discrete_vecs(*number):
+    return np.random.randint(-20, 20, size=[*number, DIMS])
 
-def generate_float_vecs(number):
-    return np.random.rand(number, DIMS) * 37 - 18.5
+def generate_float_vecs(*number):
+    return np.random.rand(*number, DIMS) * 37 - 18.5
 
-test = MetricTest(d, generate_discrete_vecs)
-res = test.run_test(30000)
+test = MetricTest(d, generate_float_vecs)
+res = test.run_test(3000)
 res
-
-# %%
-[r for r in res if r[0] != "skipped"]
 
 # %%
 @dataclass
 class MultivariateTimeSeries:
-    DISCRETE = True
+    discrete = True
 
     # number of sampels in a series
     WINDOW_LEN:int
     # number of time series
     N_SERIES:int
 
-    def generate(self, number):
-        shape = (number, self.N_SERIES, self.WINDOW_LEN)
-        if self.DISCRETE:
+    def generate(self, *number):
+        shape = (*number, self.N_SERIES, self.WINDOW_LEN)
+        if self.discrete:
             return np.random.randint(-20, 20, size=shape)
         else:
             return np.random.rand(*shape) * 37 - 18.5
 
-    def __call__(self, number):
-        return self.generate(number)
+    def __call__(self, *number):
+        return self.generate(*number)
 
 mts_generator = MultivariateTimeSeries(5, 3)
-mts_generator.DISCRETE = False
+mts_generator.discrete = False
 
 def mvts_distance(x,y):
-    n_series, window_len = x.shape
-    dist = np.zeros(n_series)
-    for s in range(n_series):
-        dist[s] = d(x[s], y[s])**2
+    n_series, _ = x.shape
+    dist = [d(x[s], y[s])**2 for s in range(n_series)]
     return np.sqrt(np.sum(dist))
 
-samples_dists = [mvts_distance(*mts_generator(2)) for _ in tqdm(range(100000))]
+def mvts_distance_chebichev(x,y):
+    n_series, _ = x.shape
+    dist = [d(x[s], y[s]) for s in range(n_series)]
+    return np.max(dist)
+
+def mvts_distance_taxi(x,y):
+    n_series, _ = x.shape
+    dist = [d(x[s], y[s]) for s in range(n_series)]
+    return np.sum(dist)
+
+samples_dists = [mvts_distance_taxi(*mts_generator(2)) for _ in tqdm(range(10000))]
 plt.hist(samples_dists, bins=100)
 plt.show()
-# %%
 
-test = MetricTest(mvts_distance, mts_generator)
-res = test._run_test(100000, False)
-res
 # %%
+test = MetricTest(mvts_distance_chebichev, mts_generator)
+res = test.run_test(300000)
 res
 
-
-
+# %%
 
 
 
