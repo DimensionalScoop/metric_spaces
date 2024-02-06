@@ -5,6 +5,7 @@ from tqdm import tqdm
 from itertools import chain
 import os
 
+import joblib
 from joblib import Parallel, delayed
 
 
@@ -45,7 +46,7 @@ class MetricTest:
 
     def run_test(self, n_samples=10000, multicore=True):
         step_size = 1000
-        n_jobs = 20 if multicore else 1
+        n_jobs = joblib.cpu_count() if multicore else 1
         executor = Parallel(n_jobs=n_jobs, verbose=3)
 
         jobs = [delayed(self._run_test_unit)(step_size) for _ in range(0, n_samples, step_size)]
