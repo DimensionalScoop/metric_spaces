@@ -79,11 +79,15 @@ npt.assert_almost_equal(differences, 0)
 # %%
 DIMS = 15
 
-def generate_discrete_vecs(*number):
-    return np.random.randint(-20, 20, size=[*number, DIMS])
+def generate_discrete_vecs(*number, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
+    return rng.integers(-20, 20, size=[*number, DIMS])
 
-def generate_float_vecs(*number):
-    return np.random.rand(*number, DIMS) * 37 - 18.5
+def generate_float_vecs(*number, rng=None):
+    if rng is None:
+        rng = np.random.default_rng()
+    return rng.random(size=[*number, DIMS]) * 37 - 18.5
 
 test = MetricTest(d, generate_float_vecs)
 res = test.run_test(3000)
@@ -99,18 +103,20 @@ class MultivariateTimeSeries:
     # number of time series
     N_SERIES:int
 
-    def generate(self, *number):
+    def generate(self, *number, rng=None):
+        if rng is None:
+            rng = np.random.default_rng()
         shape = (*number, self.N_SERIES, self.WINDOW_LEN)
         if self.discrete:
-            return np.random.randint(-20, 20, size=shape)
+            return rng.integers(-20, 20, size=shape)
         else:
-            return np.random.rand(*shape) * 37 - 18.5
+            return rng.random(size=shape) * 37 - 18.5
 
-    def __call__(self, *number):
-        return self.generate(*number)
+    def __call__(self, *number, rng=None):
+        return self.generate(*number, rng=rng)
 
-mts_generator = MultivariateTimeSeries(5, 3)
-mts_generator.discrete = False
+mts_generator = MultivariateTimeSeries(5, 4)
+mts_generator.discrete = True
 
 def mvts_distance(x,y):
     n_series, _ = x.shape
@@ -127,18 +133,40 @@ def mvts_distance_taxi(x,y):
     dist = [d(x[s], y[s]) for s in range(n_series)]
     return np.sum(dist)
 
-samples_dists = [mvts_distance_taxi(*mts_generator(2)) for _ in tqdm(range(10000))]
+samples_dists = [mvts_distance(*mts_generator(2)) for _ in tqdm(range(10000))]
 plt.hist(samples_dists, bins=100)
 plt.show()
 
 # %%
-test = MetricTest(mvts_distance_chebichev, mts_generator)
-res = test.run_test(300000)
-res
+mts_generator = MultivariateTimeSeries(5, 4)
+mts_generator.discrete = True
+
+test = MetricTest(mvts_distance, mts_generator)
+samples_per_min = 760_000 * 2 // 3
+n = samples_per_min * 30
+res = test.run_test(n)
+np.unique([msg for msg, _ in res], return_counts=True)
+# %%
+res[0]
+# %%
+# this raises a no variance error:
+vecs = np.asarray((np.array([[-14,  -1,   1,   5],
+          [-20,  -4,   9,  14],
+          [-16,   8, -10, -19]]),
+   np.array([[ 16,  16,  16,  16],
+          [-16,  15,  13, -15],
+          [ -8,  -3,   4,   3]]),
+   np.array([[  4,  14,  12, -12],
+          [  4, -14,  -4,  10],
+          [  9, -17, -19, -20]]),
+   np.array([[ 19, -11, -17,  16],
+          [ -8, -14,  14,  10],
+          [ -5,   4, -14,  15]])))
+np.std(vecs, axis=2, ddof=1)
+
+
 
 # %%
-
-
 
 def histogram_overlap(data_a, data_b, bins=50):
     both = np.hstack((data_a, data_b))

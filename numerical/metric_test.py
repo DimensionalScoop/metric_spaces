@@ -3,6 +3,7 @@
 import numpy as np
 from tqdm import tqdm
 from itertools import chain
+import os
 
 from joblib import Parallel, delayed
 
@@ -43,13 +44,22 @@ class MetricTest:
         return diff > self.atol and self.d(x, y) < self.atol
 
     def run_test(self, n_samples=10000, multicore=True):
+        step_size = 1000
         n_jobs = 20 if multicore else 1
         executor = Parallel(n_jobs=n_jobs, verbose=3)
 
-        points = self.vector_generators_func(n_samples, 4)
-        jobs = [delayed(self._test_single)(*p) for p in points]
-        result = executor(jobs)
+        jobs = [delayed(self._run_test_unit)(step_size) for _ in range(0, n_samples, step_size)]
+        result = executor(list(jobs))
         return list(chain.from_iterable(result)) 
+
+    def _run_test_unit(self, n_samples):
+        seed = int.from_bytes(os.urandom(4))
+        rng = np.random.default_rng(seed)
+ 
+        points = self.vector_generators_func(n_samples, 4, rng=rng)
+        result = [self._test_single(*p) for p in points]
+        return list(chain.from_iterable(result)) 
+
 
     def _test_single(self, x, y, z, k):
         messages = []
