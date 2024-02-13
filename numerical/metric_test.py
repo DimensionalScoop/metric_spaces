@@ -12,6 +12,15 @@ from joblib import Parallel, delayed
 class NoVarianceError(ValueError):
     pass
 
+def histogram_overlap(data_a, data_b, bins=50):
+    both = np.hstack((data_a, data_b))
+    bins = np.histogram_bin_edges(both, bins=bins)
+    a, _ = np.histogram(data_a, bins)
+    b, _ = np.histogram(data_b, bins)
+    overlap_absolute = np.vstack((a, b)).min(axis=0).sum()
+    # bin_width = bins[1] - bins[0]
+    return overlap_absolute / len(data_a)
+
 
 class MetricTest:
     def __init__(self, distance_func, vector_generators_func, atol=1e-4) -> None:
