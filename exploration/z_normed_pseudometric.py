@@ -161,9 +161,6 @@ def mvts_distance(x, y):
     return np.sqrt(np.sum(dist))
 
 # %%
-
-
-
 def mvts_distance_chebichev(x, y):
     n_series, _ = x.shape
     dist = [d(x[s], y[s]) for s in range(n_series)]
@@ -211,6 +208,8 @@ print_results(res)
 
 # %%
 # === Histogram comparisons
+
+LOWER_BOUND_NAME = ("exact", "triangle", "two triangles", "Ptolemy")
 sig = numba.float64[:](numba.float64[:,:], numba.float64[:,:], numba.float64[:,:], numba.float64[:,:])
 @jit(sig,nopython=True)
 def lower_bounds(p1, p2, q, o):
@@ -229,50 +228,58 @@ def lower_bounds(p1, p2, q, o):
     return np.array((exact, single_triangle, two_triangle, ptolemy))
 
 
-# %%
-
 @jit(nopython=True)
 def get_all_lower_bounds(sample_list):
-    d = mvts_distance
-
     # numba doesn't like to take this more pythonic :c
     lbs = np.empty((len(sample_list), 4), dtype=float)
     for i, (p1,p2,q,o) in enumerate(sample_list):
         lbs[i,:] = lower_bounds(p1,p2,q,o)
     lbs = lbs.T
-
     return lbs
 
-def get_all_lower_bounds_multi_pivot(sample_list, d):
-    for *pivots, q, o in tqdm(sample_list):
-        lb["exact"].append(d(q,o))
+# %%
 
-        all_possible_lbs = [
-                lower_bounds(p1,p2, q, o, d)
-                for p1, p2 in combinations(pivots, 2)
-                ]
-        all_possible_lbs = np.asarray(all_possible_lbs)
-        assert all_possible_lbs.shape[1] == 3
-        best_lbs = all_possible_lbs.max(axis=1)
-        # TODO: Clean up unnamed indices
-        lb["triangle"].append(best_lbs[1])
-        lb["Ptolemy"].append(best_lbs[2])
-    return lb
+def _get_all_lower_bounds_for_all_pivot_choices(sample_list):
+    QUERY_IDX = 0
+    OBJ_IDX = 1
 
+    n_samples, vecs_per_sample, *_ = sample_list.shape
+    n_pivots = vecs_per_sample - 2
+    assert n_pivots >= 2
 
+    pivot_index = range(2, vecs_per_sample)
+    pivot_combinations = list(combinations(pivot_index, 2))
+
+    lbs = dict()
+    for p1_idx, p2_idx in tqdm(pivot_combinations):
+        points = (p1_idx, p2_idx, QUERY_IDX, OBJ_IDX)
+        two_pivot_sample_list = sample_list[:,points]
+        name = (p1_idx, p2_idx)
+        lbs[name] = get_all_lower_bounds(two_pivot_sample_list)
+    return lbs
+
+def get_all_best_lower_bounds_multi_pivot(sample_list):
+    lb_all_choices = _get_all_lower_bounds_for_all_pivot_choices(sample_list)
+    lb_all_choices = np.asarray(list(lb_all_choices.values()))
+    # expected shape:
+    pivot_choice, lower_bound_type, sample = lb_all_choices.shape
+    # choose the pivot combination that has the best lb available
+    return lb_all_choices.max(axis=0)
+    
 
 mts_generator = MultivariateTimeSeries(5, 4)
 mts_generator.discrete = False 
-samples_vecs = mts_generator(10000, 4) 
+n_pivots = 10
+samples_vecs = mts_generator(10000, 2 + n_pivots) 
 print(samples_vecs.shape)
 
-lbs = get_all_lower_bounds(samples_vecs)
-# %%
+lbs = get_all_best_lower_bounds_multi_pivot(samples_vecs)
+lbs = dict(zip(LOWER_BOUND_NAME, lbs))
 # %% 
 
-def plot_hist(lbs, mts_generator):
+def plot_hist(lbs, mts_generator, n_pivots):
     shape = f"$ {mts_generator.N_SERIES} \\times {mts_generator.WINDOW_LEN} $"
-    plt.xlabel(f"$d_m$ distance between two random {shape} time series") 
+    plt.xlabel(f"$d_m$ distance between two random {shape} time series\nusing {n_pivots} pivots") 
     plt.ylabel("density")
 
     exact_dists = lbs["exact"]
@@ -291,14 +298,27 @@ def plot_hist(lbs, mts_generator):
     plt.grid()
     plt.tight_layout()
 
-SAMPLES = 100
-NUM_PIVS = 2
-mts_generator = MultivariateTimeSeries(5, 4)
+plot_hist(lbs, mts_generator, n_pivots)
+plt.savefig("/fig/small_hist.png", dpi=300)
+plt.show()
+
+# %%
+
+samples = int(1e3)
+n_pivots = 15*4
+mts_generator = MultivariateTimeSeries(15, 4)
 mts_generator.discrete = False 
 
-samples_vecs = mts_generator(SAMPLES,2+NUM_PIVS) 
+samples_vecs = mts_generator(samples, 2 + n_pivots) 
 
-lbs = get_all_lower_bounds_multi_pivot(samples_vecs, mvts_distance)
+lbs = get_all_best_lower_bounds_multi_pivot(samples_vecs)
+lbs = dict(zip(LOWER_BOUND_NAME, lbs))
+lbs.pop("two triangles")
+
+# %%
+plot_hist(lbs, mts_generator, n_pivots)
+plt.savefig("/fig/large_hist.png", dpi=300)
+plt.show()
 
 
 
@@ -311,12 +331,14 @@ samples_vecs = mts_generator(SAMPLES,4)
 
 lbs = get_all_lower_bounds(samples_vecs, mvts_distance)
 
+# %%
 plot_hist(lbs, mts_generator)
 plt.savefig("/fig/small_hist.svg")
 plt.show()
 
 # %%
-
+lbs.keys()
+# %%
 plot_hist(lbs, mts_generator)
 plt.savefig("/fig/small_hist.png" )
 plt.show()
