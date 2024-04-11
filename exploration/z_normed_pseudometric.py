@@ -15,6 +15,7 @@ import pandas as pd
 from scipy.stats import pearsonr, zscore
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import scienceplots
 from collections import defaultdict 
 from itertools import combinations
 from dataclasses import dataclass
@@ -28,31 +29,62 @@ sys.path.append("/home/elayn/epix/metric_spaces/")
 
 from numerical.metric_test import MetricTest, NoVarianceError
 
-# %%
+# ieee paper require a weird plot format
+plt.style.use(['science', 'std-colors', 'ieee', ])
 
-
 # %%
-def corr(x, y, ddof=1):
+corr_signature = numba.float64(numba.float64[:], numba.float64[:])
+dist_signature = numba.float64(numba.float64[:], numba.float64[:])
+multivar_dist_signature = numba.float64(numba.float64[:,:], numba.float64[:,:])
+
+@jit(corr_signature, nopython=True)
+def corr(x, y):
+    ddof=1
     var_x, cov, cov, var_y = np.cov(x, y, ddof=ddof).flatten()
     if var_x == 0 or var_y == 0:
         raise NoVarianceError("variable has no variance!")
 
     cov = cov / np.sqrt(var_x * var_y)
-    return np.clip(cov, -1, 1)  # pearsonr(x,y).statistic
+    # numba doesn't like scalar use of np.clip
+    if cov < -1:
+        cov = -1
+    elif cov > 1:
+        cov = 1
+    return cov # pearsonr(x,y).statistic
 
 
+@jit(dist_signature, nopython=True)
+def d(x, y):
+    return np.sqrt(2 * (1 - corr(x, y)))
+
+@jit(multivar_dist_signature, nopython=True)
+def mvts_distance(x, y):
+    n_series, _ = x.shape
+    dist = [d(x[s], y[s]) ** 2 for s in range(n_series)]
+    dist = np.asarray(dist)
+    return np.sqrt(np.sum(dist))
+
+# %%
+def mvts_distance_chebichev(x, y):
+    n_series, _ = x.shape
+    dist = [d(x[s], y[s]) for s in range(n_series)]
+    return np.max(dist)
+
+
+def mvts_distance_taxi(x, y):
+    n_series, _ = x.shape
+    dist = [d(x[s], y[s]) for s in range(n_series)]
+    return np.sum(dist)
+
+# %%
 def cos_theta(x, y):
     x_n, y_n = np.linalg.norm(x), np.linalg.norm(y)
     return np.sum(x * y, axis=0) / x_n / y_n
 
 
-def d(x, y):
-    return np.sqrt(2 * (1 - corr(x, y)))
-
-
 # %%
 DIMS = 10
-SAMPLES = 10000
+SAMPLES = 100000
 
 dists = defaultdict(list)
 
@@ -98,9 +130,8 @@ def generate_float_vecs(*number, rng=None):
 
 
 test = MetricTest(d, generate_float_vecs)
-res = test.run_test(3000)
+res = test.run_test(3000000)
 res
-
 
 # %%
 @dataclass
@@ -117,65 +148,13 @@ class MultivariateTimeSeries:
             rng = np.random.default_rng()
         shape = (*number, self.N_SERIES, self.WINDOW_LEN)
         if self.discrete:
-            return rng.integers(-20, 21, size=shape)
+            rv = rng.integers(-20, 21, size=shape)
+            return np.asarray(rv, dtype="float64")
         else:
             return rng.random(size=shape) * 40 - 20
 
     def __call__(self, *number, rng=None):
         return self.generate(*number, rng=rng)
-
-
-mts_generator = MultivariateTimeSeries(5, 4)
-mts_generator.discrete = True
-
-# %% 
-corr_signature = numba.float64(numba.float64[:], numba.float64[:])
-dist_signature = numba.float64(numba.float64[:], numba.float64[:])
-multivar_dist_signature = numba.float64(numba.float64[:,:], numba.float64[:,:])
-
-@jit(corr_signature, nopython=True)
-def corr(x, y):
-    ddof=1
-    var_x, cov, cov, var_y = np.cov(x, y, ddof=ddof).flatten()
-    if var_x == 0 or var_y == 0:
-        raise NoVarianceError("variable has no variance!")
-
-    cov = cov / np.sqrt(var_x * var_y)
-    # numba doesn't like scalar use of np.clip
-    if cov < -1:
-        cov = -1
-    elif cov > 1:
-        cov = 1
-    return cov # pearsonr(x,y).statistic
-
-
-@jit(dist_signature, nopython=True)
-def d(x, y):
-    return np.sqrt(2 * (1 - corr(x, y)))
-
-@jit(multivar_dist_signature, nopython=True)
-def mvts_distance(x, y):
-    n_series, _ = x.shape
-    dist = [d(x[s], y[s]) ** 2 for s in range(n_series)]
-    dist = np.asarray(dist)
-    return np.sqrt(np.sum(dist))
-
-# %%
-def mvts_distance_chebichev(x, y):
-    n_series, _ = x.shape
-    dist = [d(x[s], y[s]) for s in range(n_series)]
-    return np.max(dist)
-
-
-def mvts_distance_taxi(x, y):
-    n_series, _ = x.shape
-    dist = [d(x[s], y[s]) for s in range(n_series)]
-    return np.sum(dist)
-
-# %% 
-
-vecs = [(*mts_generator(4)) for _ in tqdm(range(10000))]
-plt.hist(samples_dists, bins=100)
 
 # %%
 print("---Discrete Test---")
@@ -184,7 +163,7 @@ mts_generator.discrete = True
 
 test = MetricTest(mvts_distance, mts_generator, atol=1e-8)
 samples_per_min = 760_000 * 2 // 3
-long_run = samples_per_min * 0.01
+long_run = samples_per_min  //3
 n = samples_per_min * 15
 res = test.run_test(int(n))
 
@@ -209,7 +188,7 @@ print_results(res)
 # %%
 # === Histogram comparisons
 
-LOWER_BOUND_NAME = ("exact", "triangle", "two triangles", "Ptolemy")
+LOWER_BOUND_NAME = ("exact", "triangle LB", "two triangles", "Ptolemy LB")
 sig = numba.float64[:](numba.float64[:,:], numba.float64[:,:], numba.float64[:,:], numba.float64[:,:])
 @jit(sig,nopython=True)
 def lower_bounds(p1, p2, q, o):
@@ -267,16 +246,24 @@ def get_all_best_lower_bounds_multi_pivot(sample_list):
     return lb_all_choices.max(axis=0)
     
 
-mts_generator = MultivariateTimeSeries(5, 4)
+mts_generator = MultivariateTimeSeries(4, 3)
 mts_generator.discrete = False 
-n_pivots = 10
+n_pivots = 4*3
 samples_vecs = mts_generator(10000, 2 + n_pivots) 
 print(samples_vecs.shape)
 
 lbs = get_all_best_lower_bounds_multi_pivot(samples_vecs)
 lbs = dict(zip(LOWER_BOUND_NAME, lbs))
-# %% 
 
+def intrinsic_dims(distance_samples):
+    mu = np.mean(distance_samples) 
+    var = np.var(distance_samples, ddof=1)
+    return mu**2 / 2 / var
+
+intrinsic_dims(lbs["exact"]), intrinsic_dims(lbs["Ptolemy LB"]), intrinsic_dims(lbs["triangle LB"])
+
+
+# %%
 def plot_hist(lbs, mts_generator, n_pivots):
     shape = f"$ {mts_generator.N_SERIES} \\times {mts_generator.WINDOW_LEN} $"
     plt.xlabel(f"$d_m$ distance between two random {shape} time series\nusing {n_pivots} pivots") 
@@ -295,17 +282,69 @@ def plot_hist(lbs, mts_generator, n_pivots):
         plt.hist(lb_samples, histtype="step", label=name, **hist_conf)
 
     plt.legend()
-    plt.grid()
     plt.tight_layout()
 
 plot_hist(lbs, mts_generator, n_pivots)
-plt.savefig("/fig/small_hist.png", dpi=300)
+# plt.savefig("/fig/small_hist.png", dpi=300)
+plt.show()
+# %%
+samples = int(5e4)
+n_pivots = 15
+mts_generator = MultivariateTimeSeries(5, 3)
+mts_generator.discrete = False 
+
+samples_vecs = mts_generator(samples, 2 + n_pivots) 
+
+lbs = get_all_best_lower_bounds_multi_pivot(samples_vecs)
+lbs = dict(zip(LOWER_BOUND_NAME, lbs))
+lbs.pop("two triangles")
+
+def _lims():
+    plt.ylim(0,2.3)
+    plt.xlim(0,3.5)
+_lims()
+plot_hist(lbs, mts_generator, n_pivots)
+plt.savefig("/fig/small_hist.png")
 plt.show()
 
 # %%
+samples = int(5e4)
+n_pivots = 8*4
+mts_generator = MultivariateTimeSeries(8, 4)
+mts_generator.discrete = False 
 
-samples = int(1e3)
+samples_vecs = mts_generator(samples, 2 + n_pivots) 
+
+lbs = get_all_best_lower_bounds_multi_pivot(samples_vecs)
+lbs = dict(zip(LOWER_BOUND_NAME, lbs))
+lbs.pop("two triangles")
+
+_lims()
+plot_hist(lbs, mts_generator, n_pivots)
+plt.savefig("/fig/large_hist.png")
+plt.show()
+
+
+
+# %%
+samples = int(1e4)
 n_pivots = 15*4
+mts_generator = MultivariateTimeSeries(10, 3)
+mts_generator.discrete = False 
+
+samples_vecs = mts_generator(samples, 2 + n_pivots) 
+
+lbs = get_all_best_lower_bounds_multi_pivot(samples_vecs)
+lbs = dict(zip(LOWER_BOUND_NAME, lbs))
+lbs.pop("two triangles")
+
+plot_hist(lbs, mts_generator, n_pivots)
+plt.savefig("/fig/large_hist.png", dpi=300)
+plt.show()
+
+# %%
+samples = int(1e3)
+n_pivots = 15*4*3*3
 mts_generator = MultivariateTimeSeries(15, 4)
 mts_generator.discrete = False 
 
@@ -317,8 +356,12 @@ lbs.pop("two triangles")
 
 # %%
 plot_hist(lbs, mts_generator, n_pivots)
-plt.savefig("/fig/large_hist.png", dpi=300)
+plt.savefig("/fig/very_large_hist.png", dpi=300)
 plt.show()
+
+
+
+# %%
 
 
 
