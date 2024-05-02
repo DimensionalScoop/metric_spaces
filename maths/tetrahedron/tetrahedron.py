@@ -37,8 +37,8 @@ upper_bound_symbolic = sqrt(
         q0 ** 2 - 4 * (-p / 2 + q0 / 2 + q1 / 2) * (p / 2 - q0 / 2 + q1 / 2) * (p / 2 + q0 / 2 - q1 / 2) * (
                 p / 2 + q0 / 2 + q1 / 2) / p ** 2), true))) ** 2)
 
-_lower_bound = lambdify([p, q_0, q_1, o_0, o_1], lower_bound_symbolic, "numpy")
-_upper_bound = lambdify([p, q_0, q_1, o_0, o_1], upper_bound_symbolic, "numpy")
+_lower_bound = lambdify([p, q0, q1, o0, o1], lower_bound_symbolic, "numpy")
+_upper_bound = lambdify([p, q0, q1, o0, o1], upper_bound_symbolic, "numpy")
 
 
 def lower_bound(
