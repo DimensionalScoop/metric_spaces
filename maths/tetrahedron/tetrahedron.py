@@ -1,6 +1,8 @@
 """Numerical functions for evaluating tetrahedron bounds for 4-embeddable metric spaces.
 Duplicates code from the juypter notebook of the same name."""
 
+import numpy as np
+import warnings
 from sympy import *
 
 
@@ -56,3 +58,35 @@ def upper_bound(
         p0_object_dist,
         p1_object_dist, ):
     return _upper_bound(pivot_pivot_dist, p0_query_dist, p1_query_dist, p0_object_dist, p1_object_dist)
+
+
+height_over_base = sqrt(-(-o0 - o1 + p)*(-o0 + o1 + p)*(o0 - o1 + p))*sqrt(o0 + o1 + p)/(2*p)
+width_relative_to_p0 = Piecewise((-sqrt(o0**2 + (-o0 - o1 + p)*(-o0 + o1 + p)*(o0 - o1 + p)*(o0 + o1 + p)/(4*p**2)), o1**2 > o0**2 + p**2), (sqrt(o0**2 + (-o0 - o1 + p)*(-o0 + o1 + p)*(o0 - o1 + p)*(o0 + o1 + p)/(4*p**2)), true))
+
+def project_to_2d_euclidean(points, p0, p1, dist_func):
+    numeric_p = dist_func(p0,p1)
+    numeric_o0 = dist_func(points, p0)
+    numeric_o1 = dist_func(points, p1)
+    
+    h = height_over_base.subs({p:numeric_p})
+    h = lambdify([o0,o1], h, "numpy")
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        # if the pivots are part of `points`, we get a warning form labdify
+        y = h(numeric_o0, numeric_o1)
+
+    # if the pivots are part of `points`, their y is calculated as 'nan'
+    y[(numeric_o0 == 0) | (numeric_o1 == 0)] = 0
+
+    w = width_relative_to_p0.subs({p:numeric_p})
+    w = lambdify([o0,o1], w, "numpy")
+    x = w(numeric_o0, numeric_o1)
+
+    rv = np.empty([len(points), 2])
+    rv[:,0] = x
+    rv[:,1] = y
+    return rv
+    
+    
+    

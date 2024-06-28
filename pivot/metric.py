@@ -1,6 +1,7 @@
 """Calculate the distances between two points or a list of points"""
 import numpy as np
 
+# TODO: Replace minkwosky distances with scipy.spacial.minkowski_distance
 
 def _preproc_points(a, b):
     a = np.asarray(a)
