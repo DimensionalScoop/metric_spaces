@@ -16,10 +16,27 @@ def dist_func(x, y):
 rng = np.random.default_rng()
 
 
-def generate_points(dim, n_samples):
-    # return rng.integers(-37, 38, size=[n_samples, dim])
-    # return rng.random(size=[n_samples, dim]) * (37 * 2) - 37
-    return rng.normal(3, 10, size=[n_samples, dim])
+def generate_points(dim, n_samples, style="gauss"):
+    match style:
+        case "uniform":
+            return rng.integers(-37, 38, size=[n_samples, dim])
+        case "gauss":
+            return rng.random(size=[n_samples, dim]) * (37 * 2) - 37
+        case "bimodal":
+            return np.vstack(
+                (
+                    rng.normal(3, 2, size=[n_samples // 2, dim]),
+                    rng.normal(20, 2, size=[n_samples // 2, dim]),
+                )
+            )
+        case _:
+            raise NotImplementedError(style)
+
+
+db = generate_points(2, 10000)
+all_dists = spatial.distance_matrix(db, db, 2)
+plt.hist(all_dists.flatten(), bins=100)
+plt.show()
 
 
 def choose_pair(points):
@@ -76,7 +93,7 @@ def run_random_experiment(dims, n_points, k_sigma_threshold):
     del k_sigma_threshold
     db = generate_points(dims, n_points)
 
-    cycles = int(n_points**1.4)
+    cycles = int(n_points**1)
     a = rng.choice(db, size=cycles, replace=True)
     b = rng.choice(db, size=cycles, replace=True)
     ds = dist_func(a, b)
@@ -95,7 +112,7 @@ for func in [run_experiment, run_random_experiment]:
     cycles = []
     for n in tqdm(NS):
         n = int(n)
-        results = [func(20, n, 1) for _ in range(30)]
+        results = [func(20, n, 0) for _ in range(30)]
         cycles.append(np.mean([r[0] for r in results]))
         qualities.append(np.mean([r[1] for r in results]))
 
@@ -123,6 +140,5 @@ for func in [run_experiment, run_random_experiment]:
     plt.xscale("log")
     plt.grid()
     plt.legend()
-
 
 plt.show()
