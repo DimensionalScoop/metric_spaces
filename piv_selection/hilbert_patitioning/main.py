@@ -2,7 +2,6 @@ import numpy as np
 from scipy import spatial
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from numba import jit
 from scipy import optimize
 from scipy import stats
 

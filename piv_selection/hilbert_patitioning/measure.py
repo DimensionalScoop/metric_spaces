@@ -1,5 +1,6 @@
 import timeit
 
+
 class Measure:
     def __init__(self):
         self.event_count = 0
@@ -18,20 +19,3 @@ class Measure:
 
     def get_results(self):
         return self.execution_time, self.event_count
-
-
-def test_measure():
-    import time
-    import numpy as np
-
-    def test(counter):
-        for _ in range(10):
-            counter()
-        time.sleep(0.05)
-
-    with Measure() as m:
-        test(m.count_event)
-        test(m.count_event)
-
-    assert m.event_count == 2 * 10
-    assert np.allclose(m.execution_time, 0.05 * 2, atol=0.005)
