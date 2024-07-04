@@ -59,6 +59,7 @@ def test_projection_of_2d(tri_h):
 
 def test_projection_of_10d(points_10d):
     dists = spatial.distance_matrix(points_10d, points_10d)
+
     points_p = project_to_2d_euclidean(
         points=points_10d,
         p0=points_10d[0],

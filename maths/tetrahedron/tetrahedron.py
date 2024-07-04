@@ -4,7 +4,7 @@ Duplicates code from the juypter notebook of the same name."""
 import numpy as np
 import warnings
 from scipy import spatial
-from sympy import lambdify, sqrt, Piecewise, Symbol, true
+from sympy import lambdify, sqrt, Piecewise, Symbol, true, Rational
 
 
 o0 = Symbol("o0")
@@ -12,159 +12,26 @@ o1 = Symbol("o1")
 p = Symbol("p")
 q0 = Symbol("q0")
 q1 = Symbol("q1")
-# Code generated in the tetrahedron.ipynb using sympy.printing.print_python
+
+# Code generated in the tetrahedron.ipynb using mathematica and sympy.printing.print_python
 lower_bound_symbolic = sqrt(
     (
-        -2
-        * sqrt(
-            (-o0 / 2 + o1 / 2 + p / 2)
-            * (o0 / 2 - o1 / 2 + p / 2)
-            * (o0 / 2 + o1 / 2 - p / 2)
-        )
-        * sqrt(o0 / 2 + o1 / 2 + p / 2)
-        / p
-        + 2
-        * sqrt(
-            (-p / 2 + q0 / 2 + q1 / 2)
-            * (p / 2 - q0 / 2 + q1 / 2)
-            * (p / 2 + q0 / 2 - q1 / 2)
-        )
-        * sqrt(p / 2 + q0 / 2 + q1 / 2)
-        / p
+        sqrt(-(o0 - o1 - p) * (o0 - o1 + p) * (o0 + o1 - p)) * sqrt(o0 + o1 + p)
+        - sqrt(-(p - q0 - q1) * (p - q0 + q1) * (p + q0 - q1)) * sqrt(p + q0 + q1)
     )
     ** 2
-    + (
-        -Piecewise(
-            (
-                -sqrt(
-                    o0**2
-                    - 4
-                    * (-o0 / 2 + o1 / 2 + p / 2)
-                    * (o0 / 2 - o1 / 2 + p / 2)
-                    * (o0 / 2 + o1 / 2 - p / 2)
-                    * (o0 / 2 + o1 / 2 + p / 2)
-                    / p**2
-                ),
-                o1**2 > o0**2 + p**2,
-            ),
-            (
-                sqrt(
-                    o0**2
-                    - 4
-                    * (-o0 / 2 + o1 / 2 + p / 2)
-                    * (o0 / 2 - o1 / 2 + p / 2)
-                    * (o0 / 2 + o1 / 2 - p / 2)
-                    * (o0 / 2 + o1 / 2 + p / 2)
-                    / p**2
-                ),
-                true,
-            ),
-        )
-        + Piecewise(
-            (
-                -sqrt(
-                    q0**2
-                    - 4
-                    * (-p / 2 + q0 / 2 + q1 / 2)
-                    * (p / 2 - q0 / 2 + q1 / 2)
-                    * (p / 2 + q0 / 2 - q1 / 2)
-                    * (p / 2 + q0 / 2 + q1 / 2)
-                    / p**2
-                ),
-                q1**2 > p**2 + q0**2,
-            ),
-            (
-                sqrt(
-                    q0**2
-                    - 4
-                    * (-p / 2 + q0 / 2 + q1 / 2)
-                    * (p / 2 - q0 / 2 + q1 / 2)
-                    * (p / 2 + q0 / 2 - q1 / 2)
-                    * (p / 2 + q0 / 2 + q1 / 2)
-                    / p**2
-                ),
-                true,
-            ),
-        )
-    )
-    ** 2
-)
-upper_bound_symbolic = sqrt(
-    (
-        2
-        * sqrt(
-            (-o0 / 2 + o1 / 2 + p / 2)
-            * (o0 / 2 - o1 / 2 + p / 2)
-            * (o0 / 2 + o1 / 2 - p / 2)
-        )
-        * sqrt(o0 / 2 + o1 / 2 + p / 2)
-        / p
-        + 2
-        * sqrt(
-            (-p / 2 + q0 / 2 + q1 / 2)
-            * (p / 2 - q0 / 2 + q1 / 2)
-            * (p / 2 + q0 / 2 - q1 / 2)
-        )
-        * sqrt(p / 2 + q0 / 2 + q1 / 2)
-        / p
-    )
-    ** 2
-    + (
-        -Piecewise(
-            (
-                -sqrt(
-                    o0**2
-                    - 4
-                    * (-o0 / 2 + o1 / 2 + p / 2)
-                    * (o0 / 2 - o1 / 2 + p / 2)
-                    * (o0 / 2 + o1 / 2 - p / 2)
-                    * (o0 / 2 + o1 / 2 + p / 2)
-                    / p**2
-                ),
-                o1**2 > o0**2 + p**2,
-            ),
-            (
-                sqrt(
-                    o0**2
-                    - 4
-                    * (-o0 / 2 + o1 / 2 + p / 2)
-                    * (o0 / 2 - o1 / 2 + p / 2)
-                    * (o0 / 2 + o1 / 2 - p / 2)
-                    * (o0 / 2 + o1 / 2 + p / 2)
-                    / p**2
-                ),
-                true,
-            ),
-        )
-        + Piecewise(
-            (
-                -sqrt(
-                    q0**2
-                    - 4
-                    * (-p / 2 + q0 / 2 + q1 / 2)
-                    * (p / 2 - q0 / 2 + q1 / 2)
-                    * (p / 2 + q0 / 2 - q1 / 2)
-                    * (p / 2 + q0 / 2 + q1 / 2)
-                    / p**2
-                ),
-                q1**2 > p**2 + q0**2,
-            ),
-            (
-                sqrt(
-                    q0**2
-                    - 4
-                    * (-p / 2 + q0 / 2 + q1 / 2)
-                    * (p / 2 - q0 / 2 + q1 / 2)
-                    * (p / 2 + q0 / 2 - q1 / 2)
-                    * (p / 2 + q0 / 2 + q1 / 2)
-                    / p**2
-                ),
-                true,
-            ),
-        )
-    )
-    ** 2
-)
+    + (o0**2 - o1**2 - q0**2 + q1**2) ** 2
+) / (2 * p)
+upper_bound_symbolic = (
+    o0**2 * p**2
+    + p**2 * q0**2
+    + sqrt((-o0 + o1 + p) * (o0 - o1 + p) * (o0 + o1 - p))
+    * sqrt((-p + q0 + q1) * (p - q0 + q1) * (p + q0 - q1))
+    * sqrt(o0 + o1 + p)
+    * sqrt(p + q0 + q1)
+    / 2
+    - (o0**2 - o1**2 + p**2) * (p**2 + q0**2 - q1**2) / 2
+) ** Rational(1, 4) / sqrt(p)
 
 _lower_bound = lambdify([p, q0, q1, o0, o1], lower_bound_symbolic, "numpy")
 _upper_bound = lambdify([p, q0, q1, o0, o1], upper_bound_symbolic, "numpy")
@@ -197,30 +64,7 @@ def upper_bound(
 height_over_base = (
     sqrt(-(-o0 - o1 + p) * (-o0 + o1 + p) * (o0 - o1 + p)) * sqrt(o0 + o1 + p) / (2 * p)
 )
-width_relative_to_p0 = Piecewise(
-    (
-        -sqrt(
-            o0**2
-            + (-o0 - o1 + p)
-            * (-o0 + o1 + p)
-            * (o0 - o1 + p)
-            * (o0 + o1 + p)
-            / (4 * p**2)
-        ),
-        o1**2 > o0**2 + p**2,
-    ),
-    (
-        sqrt(
-            o0**2
-            + (-o0 - o1 + p)
-            * (-o0 + o1 + p)
-            * (o0 - o1 + p)
-            * (o0 + o1 + p)
-            / (4 * p**2)
-        ),
-        true,
-    ),
-)
+width_relative_to_p0 = (o0**2 - o1**2 + p**2) / (2 * p)
 
 
 def project_to_2d_euclidean(points, p0, p1, dist_func):
