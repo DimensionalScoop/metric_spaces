@@ -70,3 +70,31 @@ def test_projection_of_10d(points_10d):
     ubs = upper_bound_dist_matrix(points_p, points_p)
     assert np.all(lbs <= dists + ATOL)
     assert np.all(ubs >= dists - ATOL)
+
+
+def __to_set(array: np.array) -> set:
+    return set(array.tolist())
+
+
+def test_candidate_set(points_10d):
+    d = spatial.minkowski_distance
+
+    db = points_10d
+    query_idx = -1
+    pivs = db[0], db[1]
+    db_p = project_to_2d_euclidean(db, *pivs, d)
+
+    # use 10-NN distance as r
+    query = db[query_idx]
+    query_r = np.sort(d(query, db))[9]
+
+    solution_set = __to_set(np.flatnonzero(d(query, db) <= query_r))
+
+    query_p = db_p[query_idx]
+    lb_dists = d(query_p, db_p)
+    candidate_set = __to_set(np.flatnonzero(lb_dists <= query_r))
+
+    missing = solution_set.difference(candidate_set)
+    assert solution_set.issubset(
+        candidate_set
+    ), f"{missing} are missing from the candidate set!"
