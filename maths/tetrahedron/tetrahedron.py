@@ -61,9 +61,9 @@ def upper_bound(
     )
 
 
-height_over_base = (
-    sqrt(-(-o0 - o1 + p) * (-o0 + o1 + p) * (o0 - o1 + p)) * sqrt(o0 + o1 + p) / (2 * p)
-)
+height_over_base = sqrt(
+    -(-o0 - o1 + p) * (-o0 + o1 + p) * (o0 - o1 + p) * (o0 + o1 + p)
+) / (2 * p)
 width_relative_to_p0 = (o0**2 - o1**2 + p**2) / (2 * p)
 
 
