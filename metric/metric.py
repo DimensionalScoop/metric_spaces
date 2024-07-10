@@ -10,7 +10,6 @@ def _preproc_points(a, b):
 
     # do we have two points, or lists of points?
     dim = max(len(a.shape), len(b.shape))
-    assert 1 <= dim <= 2
     return a, b, dim
 
 
@@ -81,7 +80,7 @@ class Euclid(Metric):
         self.p = p
 
     def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
-        return spatial.distance(a, b, p=self.p)
+        return spatial.minkowski_distance(a, b, p=self.p)
 
 
 #
