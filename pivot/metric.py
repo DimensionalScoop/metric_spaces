@@ -1,7 +1,8 @@
 """Calculate the distances between two points or a list of points"""
-import numpy as np
 
-# TODO: Replace minkwosky distances with scipy.spacial.minkowski_distance
+import numpy as np
+from scipy import spatial
+
 
 def _preproc_points(a, b):
     a = np.asarray(a)
@@ -24,6 +25,31 @@ class Metric:
         a, b, dim = _preproc_points(a, b)
         return self._calc_distance(a, b, dim == 2)
 
+    def distance_matrix(self, x, y, threshold=1000000):
+        """like (and copied from) scipy.spatial.distance_matrix"""
+        x = np.asarray(x)
+        m, k = x.shape
+        y = np.asarray(y)
+        n, kk = y.shape
+
+        if k != kk:
+            raise ValueError(
+                f"x contains {k}-dimensional vectors but y contains "
+                f"{kk}-dimensional vectors"
+            )
+
+        if m * n * k <= threshold:
+            return self(x[:, np.newaxis, :], y[np.newaxis, :, :])
+        else:
+            result = np.empty((m, n), dtype=float)  # FIXME: figure out the best dtype
+            if m < n:
+                for i in range(m):
+                    result[i, :] = self(x[i], y)
+            else:
+                for j in range(n):
+                    result[:, j] = self(x, y[j])
+            return result
+
 
 class ProbMetric(Metric):
     """A metric that compares two probability distributions
@@ -33,7 +59,9 @@ class ProbMetric(Metric):
         if np.any(p < 0):
             raise ValueError("expected probability distributions, got negative values.")
         if not np.allclose(1, np.sum(p, axis=-1)):
-            raise ValueError("expected probability distributions, but distribution does not sum to 1")
+            raise ValueError(
+                "expected probability distributions, but distribution does not sum to 1"
+            )
 
     def __call__(self, a: np.ndarray, b: np.ndarray) -> np.array:
         self._check_prob(a)
@@ -41,44 +69,60 @@ class ProbMetric(Metric):
         return super().__call__(a, b)
 
 
-# TODO: refactor Euclid, Cheb, Manha to use Minkowski
 class Euclid(Metric):
-    def __init__(self):
-        super().__init__(r"\|\cdot\|_2")
-
-    def _calc_distance(self, a, b, is_list):
-        axis = 1 if is_list else 0
-        d_squared = np.sum((a - b) ** 2, axis=axis)
-        return np.sqrt(d_squared)
-
-
-class Chebyshev(Metric):
-    def __init__(self):
-        super().__init__(r"\|\cdot\|_\infty")
-
-    def _calc_distance(self, a, b, is_list):
-        axis = 1 if is_list else 0
-        return np.max(np.abs(a - b), axis=axis)
-
-
-class Manhattan(Metric):
-    def __init__(self):
-        super().__init__(r"\|\cdot\|_1")
-
-    def _calc_distance(self, a, b, is_list):
-        axis = 1 if is_list else 0
-        return np.sum(np.abs(a - b), axis=axis)
-
-
-class Minkowski(Metric):
-    def __init__(self, p):
+    def __init__(self, p=2):
+        if p == np.inf:
+            name = r"\|\cdot\|_\infty"
+        elif p == 2:
+            name = r"\|\cdot\|"
+        else:
+            name = r"\|\cdot\|" + f"{p:.0f}"
+        super().__init__(name)
         self.p = p
-        super().__init__(r"\|\cdot\|_" + p)
 
-    def _calc_distance(self, a, b, is_list):
-        axis = 1 if is_list else 0
-        sum_ = np.sum((a - b) ** self.p, axis=axis)
-        return sum_ ** (1 / self.p)
+    def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
+        return spatial.distance(a, b, p=self.p)
+
+
+#
+# class Euclid(Metric):
+#     def __init__(self):
+#         super().__init__(r"\|\cdot\|_2")
+#
+#     def _calc_distance(self, a, b, is_list):
+#         axis = 1 if is_list else 0
+#         d_squared = np.sum((a - b) ** 2, axis=axis)
+#         return np.sqrt(d_squared)
+#
+#
+# class Chebyshev(Metric):
+#     def __init__(self):
+#         super().__init__(r"\|\cdot\|_\infty")
+#
+#     def _calc_distance(self, a, b, is_list):
+#         axis = 1 if is_list else 0
+#         return np.max(np.abs(a - b), axis=axis)
+#
+#
+# class Manhattan(Metric):
+#     def __init__(self):
+#         super().__init__(r"\|\cdot\|_1")
+#
+#     def _calc_distance(self, a, b, is_list):
+#         axis = 1 if is_list else 0
+#         return np.sum(np.abs(a - b), axis=axis)
+#
+#
+# class Minkowski(Metric):
+#     def __init__(self, p):
+#         self.p = p
+#         super().__init__(r"\|\cdot\|_" + p)
+#
+#     def _calc_distance(self, a, b, is_list):
+#         axis = 1 if is_list else 0
+#         sum_ = np.sum((a - b) ** self.p, axis=axis)
+#         return sum_ ** (1 / self.p)
+#
 
 
 class JensenShannon(ProbMetric):
@@ -109,5 +153,5 @@ class Triangular(ProbMetric):
         super().__init__(r"Triangular Discrimination")
 
     def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
-        k = (a - b)**2 / (a+b)
+        k = (a - b) ** 2 / (a + b)
         return np.sqrt(k.sum(axis=-1))
