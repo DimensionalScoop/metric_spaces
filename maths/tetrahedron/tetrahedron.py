@@ -2,6 +2,7 @@
 Duplicates code from the juypter notebook of the same name."""
 
 import numpy as np
+import numpy.testing as npt
 import warnings
 from scipy import spatial
 from sympy import lambdify, sqrt, Piecewise, Symbol, true, Rational
@@ -68,6 +69,7 @@ width_relative_to_p0 = (o0**2 - o1**2 + p**2) / (2 * p)
 
 
 def project_to_2d_euclidean(points, p0, p1, dist_func):
+    assert not np.allclose(p0, p1), "You need to choose two distinct pivots!"
     numeric_p = dist_func(p0, p1)
     numeric_o0 = dist_func(points, p0)
     numeric_o1 = dist_func(points, p1)
