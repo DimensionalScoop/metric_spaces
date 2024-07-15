@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from scipy import optimize
 from scipy import stats
 
+from joblib import Parallel, delayed
+
 from measure import Measure
 
 
@@ -33,9 +35,9 @@ def generate_points(dim, n_samples, style="gauss"):
 
 
 db = generate_points(2, 10000)
-all_dists = spatial.distance_matrix(db, db, 2)
-plt.hist(all_dists.flatten(), bins=100)
-plt.show()
+# all_dists = spatial.distance_matrix(db, db, 2)
+# plt.hist(all_dists.flatten(), bins=100)
+# plt.show()
 
 
 def choose_pair(points):
@@ -51,21 +53,23 @@ def estimate_dist(points, sampels):
     return np.mean(dists), np.std(dists), pairs[np.argmax(dists)]
 
 
-def predict_farthes_pair(points, dist_func, discard_threshold):
+def predict_farthes_pair(points: list, dist_func, discard_threshold):
     cycle_count = 0
     best_pairs = []
     best_dists = []
 
     points = list(points)
+    center = points.pop()
     while len(points) > 1:
-        center = points.pop()
         cycle_count += len(points)
         ds = dist_func(center, points)
         best_point_idx = np.argmax(ds)
-        best_pairs.append((center, points[best_point_idx]))
+        partner = points.pop(best_point_idx)
+        best_pairs.append((center, partner))
         best_dists.append(np.max(ds))
 
         points = [p for p, d in zip(points, ds) if d > discard_threshold]
+        center = partner
 
     best_idx = np.argmax(best_dists)
     return best_pairs[best_idx], cycle_count
@@ -92,7 +96,7 @@ def run_random_experiment(dims, n_points, k_sigma_threshold):
     del k_sigma_threshold
     db = generate_points(dims, n_points)
 
-    cycles = int(n_points**1)
+    cycles = int(n_points**1.2)
     a = rng.choice(db, size=cycles, replace=True)
     b = rng.choice(db, size=cycles, replace=True)
     ds = dist_func(a, b)
@@ -104,14 +108,19 @@ def run_random_experiment(dims, n_points, k_sigma_threshold):
     return cycles, quality
 
 
+once = True
 # distance array gets to big for 1e5 entries
-for func in [run_experiment, run_random_experiment]:
-    NS = np.logspace(2, 3.3, num=10)
+for name, func in {
+    "max_dist_algo": run_experiment,
+    "best_of_random": run_random_experiment,
+}.items():
+    NS = np.logspace(2, 3.3, num=30)
     qualities = []
     cycles = []
     for n in tqdm(NS):
         n = int(n)
-        results = [func(20, n, 0) for _ in range(30)]
+        jobs = [delayed(func)(20, n, 1) for _ in range(30)]
+        results = Parallel(n_jobs=22)(jobs)
         cycles.append(np.mean([r[0] for r in results]))
         qualities.append(np.mean([r[1] for r in results]))
 
@@ -123,17 +132,20 @@ for func in [run_experiment, run_random_experiment]:
     plt.subplot(2, 1, 1)
     plt.ylabel("cycles")
     plt.plot(
-        NS, cycles, label=f"{func}" + "$\\mathcal{O}(n^{" + f"{params[0]:.1f}" + "})$"
+        NS, cycles, label=f"{name}, " + "$\\mathcal{O}(n^{" + f"{params[0]:.1f}" + "})$"
     )
-    plt.plot(NS, NS**2, label="baseline $\\mathcal{O}(n^2)$")
-    plt.plot(NS, NS, label="target $\\mathcal{O}(n)$")
-    plt.xlabel("database size")
-    plt.legend()
-    plt.loglog()
-    plt.grid()
 
+    if once:
+        once = False
+        plt.plot(NS, NS**2, label="baseline $\\mathcal{O}(n^2)$")
+        plt.plot(NS, NS, label="target $\\mathcal{O}(n)$")
+        plt.xlabel("database size")
+        plt.loglog()
+        plt.grid()
+
+    plt.legend()
     plt.subplot(2, 1, 2)
-    plt.plot(NS, np.asarray(qualities), label=f"{func}")
+    plt.plot(NS, np.asarray(qualities), label=f"{name}")
     plt.ylabel("% of possible point pairs with lower dist")
     plt.xlabel("database size")
     plt.xscale("log")
