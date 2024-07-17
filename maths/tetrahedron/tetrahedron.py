@@ -7,6 +7,10 @@ import warnings
 from scipy import spatial
 from sympy import lambdify, sqrt, Piecewise, Symbol, true, Rational
 
+from joblib import Memory
+
+mem = Memory("/tmp/joblib")
+
 
 o0 = Symbol("o0")
 o1 = Symbol("o1")
@@ -62,10 +66,27 @@ def upper_bound(
     )
 
 
-height_over_base = sqrt(
+sympy_height_over_base = sqrt(
     -(-o0 - o1 + p) * (-o0 + o1 + p) * (o0 - o1 + p) * (o0 + o1 + p)
 ) / (2 * p)
-width_relative_to_p0 = (o0**2 - o1**2 + p**2) / (2 * p)
+sympy_width_relative_to_p0 = (o0**2 - o1**2 + p**2) / (2 * p)
+
+__N_height_over_base = lambdify([o0, o1, p], sympy_height_over_base, "numpy", cse=True)
+__width_relative_to_p0 = lambdify(
+    [o0, o1, p], sympy_width_relative_to_p0, "numpy", cse=True
+)
+
+
+def height_over_base(o0_, o1_, p_):
+    if p_.size == 1:
+        p_ = np.full_like(o0_, p_)
+    return __N_height_over_base(o0_, o1_, p_)
+
+
+def width_relative_to_p0(o0_, o1_, p_):
+    if p_.size == 1:
+        p_ = np.full_like(o0_, p_)
+    return __width_relative_to_p0(o0_, o1_, p_)
 
 
 def project_to_2d_euclidean(points, p0, p1, dist_func):
@@ -74,24 +95,16 @@ def project_to_2d_euclidean(points, p0, p1, dist_func):
     numeric_o0 = dist_func(points, p0)
     numeric_o1 = dist_func(points, p1)
 
-    h = height_over_base.subs({p: numeric_p})
-    h = lambdify([o0, o1], h, "numpy")
-
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         # if the pivots are part of `points`, we get a warning form labdify
-        y = h(numeric_o0, numeric_o1)
-
+        y = height_over_base(numeric_o0, numeric_o1, numeric_p)
     # if the pivots are part of `points`, their y is calculated as 'nan'
     y[(numeric_o0 == 0) | (numeric_o1 == 0)] = 0
 
-    w = width_relative_to_p0.subs({p: numeric_p})
-    w = lambdify([o0, o1], w, "numpy")
-    x = w(numeric_o0, numeric_o1)
+    x = width_relative_to_p0(numeric_o0, numeric_o1, numeric_p)
 
-    rv = np.empty([len(points), 2])
-    rv[:, 0] = x
-    rv[:, 1] = y
+    rv = np.column_stack((x, y))
     return rv
 
 
