@@ -11,10 +11,6 @@ from sympy.series import order
 from metric.metric import Metric, Euclid
 
 
-def __count_neighbours(center_idx, radius, dist_matrix):
-    return (dist_matrix[center_idx] < radius).sum() - 1
-
-
 def candidate_set_size(points: np.ndarray, r: float, d: Metric, agg="mean") -> Any:
     """Assume every point in `points` is a proxy for
     query of range `r`. How big is the candidate set?
@@ -28,7 +24,7 @@ def candidate_set_size(points: np.ndarray, r: float, d: Metric, agg="mean") -> A
             callable: function that takes an np.ndarray and returns a float
     """
     dist_matrix = d.distance_matrix(points, points)
-    neighbours = [__count_neighbours(i, r, dist_matrix) for i in range(len(points))]
+    neighbours = (dist_matrix < r).sum(axis=-1) - 1
 
     if agg is None:
         return neighbours
