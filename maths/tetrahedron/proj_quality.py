@@ -45,6 +45,14 @@ def get_average_k_nn_dist(points, d: Metric, k=10, agg="mean"):
     return agg(k_dist)
 
 
+def hilbert_quality(points, r):
+    try:
+        part = HilbertPartitioner(points, r)
+        return part.hyperplane_quality(points)
+    except KeyError:
+        raise
+
+
 class HilbertPartitioner:
     """Finds a hyperplane bisecting the dataset which tries to maximize
     the number of partitioned points.
