@@ -1,7 +1,9 @@
 """Calculate the distances between two points or a list of points"""
 
+from ctypes import ArgumentError
 import numpy as np
 from scipy import spatial
+import numexpr
 
 
 def _preproc_points(a, b):
@@ -68,7 +70,40 @@ class ProbMetric(Metric):
         return super().__call__(a, b)
 
 
+_NUMEXPR_EUCLID = (
+    "sum((a-b)**2, axis=0)",
+    "sum((a-b)**2, axis=1)",
+    "sum((a-b)**2, axis=2)",
+)
+
+
 class Euclid(Metric):
+    """Numexpr implementation of the Euclidean distance, with a 2x speedup"""
+
+    def __init__(self, p=2):
+        if p != 2:
+            raise ArgumentError()
+        name = r"\|\cdot\|"
+        super().__init__(name)
+
+    def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
+        n_axis = max((len(a.shape), len(b.shape)))
+        return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[n_axis - 1]))
+
+    def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
+        if a is not b:
+            return super().distance_matrix(a, b)
+
+        b = a[np.newaxis, :, :]
+        a = a[:, np.newaxis, :]
+
+        if rank_only:
+            return numexpr.evaluate(_NUMEXPR_EUCLID[2])
+        else:
+            return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[2]))
+
+
+class PNorm(Metric):
     def __init__(self, p=2):
         if p == np.inf:
             name = r"\|\cdot\|_\infty"
@@ -80,7 +115,7 @@ class Euclid(Metric):
         self.p = p
 
     def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
-        return spatial.minkowski_distance(a, b, p=self.p)
+        return spatial.minkowski_distance(a, b, self.p)
 
 
 #
