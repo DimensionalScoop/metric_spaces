@@ -82,17 +82,13 @@ def compare_projections(
 
 
 metric = Euclid(2)
-N_RUNS = range(1)
-N_SAMPLES = 500
+N_RUNS = range(4)
+N_SAMPLES = 512
 DIMS = range(2, 18)
-N_CPUS = 20
+N_CPUS = 64
 
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
-
-k, v = generators.popitem()
-generators = {k: v}
-assert len(generators) == 1
 
 
 def run(run_id, dim):
@@ -102,18 +98,20 @@ def run(run_id, dim):
         [dim],
         seed=100 * run_id + dim,
         errors="skip",
-        verbose=True,
+        verbose=False,
     )
     r["run"] = run_id
     return r
 
 
-jobs = []
-for run_id in N_RUNS:
-    for dim in DIMS:
-        jobs.append(delayed(run)(run_id, dim))
+for globalrun in range(10000):
+    print(f"============ global run {globalrun} ==============")
+    jobs = []
+    for run_id in N_RUNS:
+        for dim in DIMS:
+            jobs.append(delayed(run)(globalrun + run_id, dim))
 
-results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=11)(jobs))
-results.to_csv(
-    f"./results_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}-samples_{len(N_RUNS)}-runs.csv"
-)
+    results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=11)(jobs))
+    results.to_csv(
+        f"results/results_{globalrun}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}-samples_{len(N_RUNS)}-runs.csv"
+    )
