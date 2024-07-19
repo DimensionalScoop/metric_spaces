@@ -95,14 +95,17 @@ class Euclid(Metric):
 from metric.metric import PNorm, Euclid
 
 metric = PNorm(2)
-metric = Euclid(2)
+# metric = Euclid(2)
 
 from joblib import delayed, Parallel
 
 
 def run(seed):
     rng = np.random.default_rng(seed)
-    for _ in range(20):
+    samples = range(20)
+    if seed % 10 == 0:
+        samples = tqdm(samples)
+    for _ in samples:
         points = point_generator.generate_gaussian_points(rng, 3000, 7, False)
         res = metric.distance_matrix(points, points)
     return res.sum()
@@ -111,7 +114,7 @@ def run(seed):
 import time
 
 start_time = time.perf_counter()
-Parallel(10)(delayed(run)(i) for i in range(20))
+Parallel(10)(delayed(run)(i) for i in range(64))
 end_time = time.perf_counter()
 
 execution_time = end_time - start_time
