@@ -101,7 +101,7 @@ def run(run_id, dim):
         piv_selectors,
         [dim],
         seed=100 * run_id + dim,
-        errors="raise",
+        errors="skip",
         verbose=True,
     )
     r["run"] = run_id

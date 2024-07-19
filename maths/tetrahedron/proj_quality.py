@@ -52,11 +52,8 @@ def get_average_k_nn_dist(points, d: Metric, k=10, agg="mean"):
 
 
 def hilbert_quality(points, r):
-    try:
-        part = HilbertPartitioner(points, r)
-        return part.hyperplane_quality(points)
-    except KeyError:
-        raise
+    part = HilbertPartitioner(points, r)
+    return part.hyperplane_quality(points)
 
 
 class HilbertPartitioner:
