@@ -94,8 +94,8 @@ class Euclid(Metric):
 
 from metric.metric import PNorm, Euclid
 
-metric = PNorm(2)
-# metric = Euclid(2)
+# metric = PNorm(2)
+metric = Euclid(2)
 
 from joblib import delayed, Parallel
 
@@ -114,7 +114,7 @@ def run(seed):
 import time
 
 start_time = time.perf_counter()
-Parallel(10)(delayed(run)(i) for i in range(64))
+Parallel(1)(delayed(run)(i) for i in range(2))
 end_time = time.perf_counter()
 
 execution_time = end_time - start_time

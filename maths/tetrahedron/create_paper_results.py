@@ -83,12 +83,16 @@ def compare_projections(
 
 metric = Euclid(2)
 N_RUNS = range(1)
-N_SAMPLES = 120
-DIMS = range(2, 17)
-N_CPUS = 10
+N_SAMPLES = 500
+DIMS = range(2, 18)
+N_CPUS = 20
 
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
+
+k, v = generators.popitem()
+generators = {k: v}
+assert len(generators) == 1
 
 
 def run(run_id, dim):
@@ -110,4 +114,6 @@ for run_id in N_RUNS:
         jobs.append(delayed(run)(run_id, dim))
 
 results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=11)(jobs))
-results.to_csv("./results.csv")
+results.to_csv(
+    f"./results_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}-samples_{len(N_RUNS)}-runs.csv"
+)

@@ -23,7 +23,13 @@ def candidate_set_size(points: np.ndarray, r: float, d: Metric, agg="mean") -> A
             "mean": np.mean
             callable: function that takes an np.ndarray and returns a float
     """
-    dist_matrix = d.distance_matrix(points, points)
+    if len(points) > 200:
+        samples_size = int(np.sqrt(len(points)))
+        points_samples = points[:samples_size]
+        dist_matrix = d.distance_matrix(points_samples, points)
+    else:
+        dist_matrix = d.distance_matrix(points, points)
+
     neighbours = (dist_matrix < r).sum(axis=-1) - 1
 
     if agg is None:
@@ -68,7 +74,7 @@ class HilbertPartitioner:
         # XXX: The PCA only works with very many points. We might not find the best orientation if there is noise
         # PCA is not exactly the same as finding the most faraway points.
         self.r = r
-        self.pca = decomposition.PCA(1)
+        self.pca = decomposition.PCA(n_components=1)
         projection = self.pca.fit_transform(points)
         assert projection.shape == (len(points), 1)
         self.hyperplane = np.median(projection)
