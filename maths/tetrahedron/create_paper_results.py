@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from joblib import delayed, Parallel
 from tqdm import tqdm
+import time
 
 import sys
 
@@ -56,6 +57,7 @@ def compare_projections(
                             ),
                             hilbert_quality=proj_quality.hilbert_quality(points_p, r),
                             note="",
+                            seed=seed,
                         )
                     )
 
@@ -71,6 +73,7 @@ def compare_projections(
                                 mean_candidate_set_size=-1,
                                 hilbert_quality=-1,
                                 note="failed",
+                                seed=seed,
                             )
                         )
                 elif errors == "raise":
@@ -81,17 +84,21 @@ def compare_projections(
     return rv
 
 
+# wait to manually change nice levels before starting subprocesses
+time.sleep(10)
+
 metric = Euclid(2)
-N_RUNS = range(4)
+N_RUNS = 8
 N_SAMPLES = 512
 DIMS = range(2, 18)
 N_CPUS = 64
+SEED_OFFSET = 3710_000
 
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
 
 
-def run(run_id, dim):
+def run_task(run_id, dim):
     r = compare_projections(
         generators,
         piv_selectors,
@@ -104,14 +111,16 @@ def run(run_id, dim):
     return r
 
 
-for globalrun in range(10000):
-    print(f"============ global run {globalrun} ==============")
+for run_id in range(0, 100_000, N_RUNS):
+    print(f"============ run {run_id} to {run_id+N_RUNS} ==============")
+
     jobs = []
-    for run_id in N_RUNS:
+    for subrun in range(N_RUNS):
         for dim in DIMS:
-            jobs.append(delayed(run)(globalrun + run_id, dim))
+            this_run_id = SEED_OFFSET + run_id + subrun
+            jobs.append(delayed(run_task)(this_run_id, dim))
 
     results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=11)(jobs))
     results.to_csv(
-        f"results/results_{globalrun}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}-samples_{len(N_RUNS)}-runs.csv"
+        f"results/results_{run_id}-to-{run_id+N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}.csv"
     )
