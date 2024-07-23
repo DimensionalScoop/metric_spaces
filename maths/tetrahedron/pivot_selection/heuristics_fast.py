@@ -5,9 +5,32 @@ sys.path.append("../../")
 
 from metric.metric import Euclid
 from .common import choose_reasonably_remote_partner
+from . import heuristics_complete as heu_com
 
 
 METRIC = Euclid(2)
+
+
+def max_dist_GNAT(ps, rng: np.random.Generator, budget=np.sqrt):
+    """Chooses the most distant pair of points from a subsample of the database.
+
+    This implement the strategy used for GNAT in its original paper.
+    The basic idea is that this biases the selection towards cluster centers,
+    as long as those centers have a high point density.
+
+    Original paper: brinNeighborSearchLarge1995
+    """
+    # empirical factor from the paper
+    OVERSAMPLING_FACTOR = 3
+
+    # Here, we have to depart a bit from the original paper:
+    # Because they build an entire index and not just one projection, they
+    # need way more pivot candidates.
+    # We simulate this by considering a number of candidates "proprtional" to
+    # the number of points in the dataset.
+    n_candidates = int(OVERSAMPLING_FACTOR * budget(len(ps)))
+    pivot_candidates = rng.choice(rng, size=n_candidates, replace=False)
+    return heu_com.max_dist_points(pivot_candidates)
 
 
 def two_least_central_heuristically(ps, rng: np.random.Generator, budget=np.sqrt):
