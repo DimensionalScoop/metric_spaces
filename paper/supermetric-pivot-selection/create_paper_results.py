@@ -4,16 +4,11 @@ from joblib import delayed, Parallel
 from tqdm import tqdm
 import time
 
-import sys
-
-sys.path.append("../../")
-
-import tetrahedron
-import proj_quality
+from tetrahedron import tetrahedron, proj_quality
 from metric.metric import Euclid
 
 import pivot_selection
-import point_generator
+from generate import point_generator
 
 
 def compare_projections(

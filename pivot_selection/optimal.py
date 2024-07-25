@@ -1,7 +1,6 @@
 import numpy as np
 
-import tetrahedron
-import proj_quality
+from tetrahedron import tetrahedron, proj_quality
 from metric.metric import Euclid
 
 METRIC = Euclid(2)
