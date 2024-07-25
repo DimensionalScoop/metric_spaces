@@ -1,5 +1,21 @@
 import numpy as np
+from scipy import stats
 from tqdm.auto import tqdm
+
+
+def random_PDF(rng: np.random.Generator, size=(1, 10), n_samples=100):
+    assert len(size) == 2, "size should be of the form (sampels, bins)!"
+    dist = stats.norm(loc=rng.random(size[0]), std=rng.random(size[0]))
+    pdf = dist.rvs(size=n_samples, random_state=rng) / n_samples
+    return pdf
+
+
+def _order_axis(train):
+    data = train[b"data"]
+    data = data.reshape(-1, 3, 32, 32)
+    data = np.swapaxes(data, 1, 3)
+    data = np.swapaxes(data, 2, 1)
+    return data
 
 
 def load_cifar_100_train():
@@ -16,10 +32,7 @@ def load_cifar_100_train():
     train.keys()
 
     labels = np.asarray(train[b"coarse_labels"])
-    data = train[b"data"]
-    data = data.reshape(-1, 3, 32, 32)
-    data = np.swapaxes(data, 1, 3)
-    data = np.swapaxes(data, 2, 1)
+    data = _order_axis(train)
     return data
 
 
