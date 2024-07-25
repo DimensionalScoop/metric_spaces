@@ -1,9 +1,5 @@
 import numpy as np
 
-import sys
-
-sys.path.append("../../")
-
 import tetrahedron
 import proj_quality
 from metric.metric import Euclid

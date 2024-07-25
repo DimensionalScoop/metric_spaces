@@ -1,4 +1,5 @@
 .idea
+*/.virtual_documents
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -163,3 +164,5 @@ cython_debug/
 maths/tetrahedron/.virtual_documents
 maths/tetrahedron/results
 .virtual_documents/maths/tetrahedron
+data/cifar-100
+tetrahedron/results
