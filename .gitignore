@@ -2,7 +2,8 @@
 .virtual_documents
 
 maths/tetrahedron/results
-data/cifar-100
+data/cifar-100/*
+data/ucr-ts/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
