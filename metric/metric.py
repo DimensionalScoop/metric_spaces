@@ -5,6 +5,8 @@ import numpy as np
 from scipy import spatial
 import numexpr
 
+from . import fast_distance_matrix
+
 
 def _preproc_points(a, b):
     a = np.asarray(a)
@@ -78,7 +80,7 @@ _NUMEXPR_EUCLID = (
 
 
 class Euclid(Metric):
-    """Numexpr implementation of the Euclidean distance, with a 2x speedup"""
+    """Numba and numexpr implementation of the Euclidean distance"""
 
     def __init__(self, p=2):
         if p != 2:
@@ -93,14 +95,8 @@ class Euclid(Metric):
     def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
         if a is not b:
             return super().distance_matrix(a, b)
-
-        b = a[np.newaxis, :, :]
-        a = a[:, np.newaxis, :]
-
-        if rank_only:
-            return numexpr.evaluate(_NUMEXPR_EUCLID[2])
         else:
-            return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[2]))
+            return fast_distance_matrix.euclid(a)
 
 
 class PNorm(Metric):
@@ -116,6 +112,12 @@ class PNorm(Metric):
 
     def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
         return spatial.minkowski_distance(a, b, self.p)
+
+    def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
+        if a is not b:
+            return super().distance_matrix(a, b)
+        else:
+            return fast_distance_matrix.pnorm(a, self.p)
 
 
 #
