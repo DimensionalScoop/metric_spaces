@@ -1,15 +1,9 @@
 import numpy as np
-import sys
 from tqdm import tqdm
 
-import tetrahedron
-import proj_quality
-
-import pivot_selection
-import point_generator
+from generate import point_generator
 
 
-from scipy import spatial
 import numexpr
 
 
@@ -65,57 +59,125 @@ _NUMEXPR_EUCLID = (
     "sum((a-b)**2, axis=2)",
 )
 
-
-class Euclid(Metric):
-    """Numexpr implementation of the Euclidean distance, with a 2x speedup"""
-
-    def __init__(self, p=2):
-        if p != 2:
-            raise ArgumentError()
-        name = r"\|\cdot\|"
-        super().__init__(name)
-
-    def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
-        n_axis = max((len(a.shape), len(b.shape)))
-        return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[n_axis - 1]))
-
-    def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
-        if a is not b:
-            return super().distance_matrix(a, b)
-
-        b = a[np.newaxis, :, :]
-        a = a[:, np.newaxis, :]
-
-        if rank_only:
-            return numexpr.evaluate(_NUMEXPR_EUCLID[2])
-        else:
-            return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[2]))
-
-
 from metric.metric import PNorm, Euclid
 
-# metric = PNorm(2)
-metric = Euclid(2)
+from numba import njit
+
+
+@njit(boundscheck=False, fastmath=True)
+def dist_matrix_slow(pts, p: int):
+    n = len(pts)
+    dists = np.empty((n, n), dtype="float32")
+    np.fill_diagonal(dists, 0)
+
+    for x in range(n):
+        for y in range(x, n):
+            if p % 2 == 0:
+                d = (pts[x] - pts[y]) ** p
+            else:
+                d = np.abs(pts[x] - pts[y]) ** p
+            d = np.sum(d) ** (1 / p)
+            dists[x, y] = d
+            dists[y, x] = d
+
+    return dists
+
+
+@njit(boundscheck=False, fastmath=True)
+def dist_matrix(pts, p: int):
+    n = len(pts)
+    dists = np.empty((n, n), dtype="float32")
+    np.fill_diagonal(dists, 0)
+
+    if p % 2 == 0:
+        for x in range(n):
+            for y in range(x, n):
+                d = np.pow((pts[x] - pts[y]), p)
+                d = np.sqrt(np.sum(d))
+                dists[x, y] = d
+                dists[y, x] = d
+    else:
+        for x in range(n):
+            for y in range(x, n):
+                d = np.abs(pts[x] - pts[y]) ** p
+                d = np.sum(d) ** (1 / p)
+                dists[x, y] = d
+                dists[y, x] = d
+
+    return dists
+
+
+@njit(boundscheck=False, fastmath=True)
+def dist_matrix_euclid(pts):
+    n = len(pts)
+    dists = np.empty((n, n), dtype="float32")
+    np.fill_diagonal(dists, 0)
+    for x in range(n):
+        for y in range(x, n):
+            res = np.sqrt(np.sum((pts[x] - pts[y]) ** 2))
+            dists[x, y] = res
+            dists[y, x] = res
+
+    return dists
+
+
+class EuclidNumba(Euclid):
+    def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
+        if a is b:
+            return dist_matrix_euclid(a)
+        else:
+            return super().distance_matrix(a, b, threshold, rank_only)
+
+
+class PNormNumba(PNorm):
+    def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
+        if a is b:
+            return dist_matrix(a, self.p)
+        else:
+            return super().distance_matrix(a, b, threshold, rank_only)
+
+
+class PNormNumbaSlow(PNorm):
+    def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
+        if a is b:
+            return dist_matrix_slow(a, self.p)
+        else:
+            return super().distance_matrix(a, b, threshold, rank_only)
+
 
 from joblib import delayed, Parallel
 
 
-def run(seed):
+def run(seed, metric, n_samples=20):
     rng = np.random.default_rng(seed)
-    samples = range(20)
+    samples = range(n_samples)
     if seed % 10 == 0:
         samples = tqdm(samples)
     for _ in samples:
         points = point_generator.generate_gaussian_points(rng, 3000, 7, False)
         res = metric.distance_matrix(points, points)
-    return res.sum()
+    return res
 
 
 import time
 
-start_time = time.perf_counter()
-Parallel(1)(delayed(run)(i) for i in range(2))
-end_time = time.perf_counter()
+# warm-up
+actual = run(0, metric=EuclidNumba(), n_samples=1)
+actual = run(0, metric=PNormNumba(), n_samples=1)
+actual = run(0, metric=PNormNumbaSlow(), n_samples=1)
+desired = run(0, metric=Euclid(), n_samples=1)
+assert np.allclose(desired, actual)
 
-execution_time = end_time - start_time
-print(f"Execution time: {execution_time:.2f} seconds")
+for m in [
+    EuclidNumba(),
+    PNormNumba(),
+    EuclidNumba(),
+    PNormNumbaSlow(),
+    PNormNumba(),
+]:  # Euclid(), PNorm()]):
+    start_time = time.perf_counter()
+    Parallel(10)(delayed(run)(i, m) for i in range(10))
+    end_time = time.perf_counter()
+
+    execution_time = end_time - start_time
+    print(f"{m} Execution time: {execution_time:.2f} seconds")
