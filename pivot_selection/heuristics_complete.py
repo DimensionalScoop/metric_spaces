@@ -98,3 +98,6 @@ def different_cluster_centers(ps, rng=None):
 
 def random_pivots(ps, rng=None):
     return rng.choice(ps, size=2, replace=False)
+
+
+# TODO: Implement complete version of incremental selection heuristic

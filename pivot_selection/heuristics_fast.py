@@ -33,6 +33,42 @@ def max_dist_GNAT(ps, rng: np.random.Generator, budget=np.sqrt):
     return heu_com.max_dist_points(pivot_candidates)
 
 
+def incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
+    """Chooses pivots that maximize the sum of the best lower bounds.
+
+    This implements the strategy of the same name from a review paper.
+
+    Review paper: zhuPivotSelectionAlgorithms2022
+    """
+    # TODO: select initial candidates, object relations
+    piv_candidates = []
+
+    objects_lhs = []
+    objects_rhs = []
+
+    lb_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
+    lb_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
+    lower_bounds = np.abs(lb_lhs - lb_rhs)
+
+    lbs_quality = np.sum(lower_bounds, axis=0)
+    best_pivot_idx = np.argmax(lbs_quality)
+
+    lb_of_best_pivot = lower_bounds[best_pivot_idx]
+    lb_of_other_pivots = (
+        lower_bounds  # we can ignore that `best_pivot_idx` is included here
+    )
+
+    # choose the best available LB: use either the best pivot or the other pivot, for each pivot
+    best_lbs = np.fmax(lb_of_best_pivot.reshape(1, -1), lb_of_other_pivots, axis=1)
+    lbs_quality = best_lbs.sum(axis=1)
+    second_best_piv_idx = np.argmax(lbs_quality)
+
+    return piv_candidates[best_pivot_idx], piv_candidates[second_best_piv_idx]
+
+
+# TODO: find best scores simultaneously instead of iteratively
+
+
 def two_least_central_heuristically(ps, rng: np.random.Generator, budget=np.sqrt):
     """
     Find the two pivots that approximately maximize `Var[d(piv, .)]`.
