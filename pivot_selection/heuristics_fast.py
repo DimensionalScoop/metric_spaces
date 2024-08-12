@@ -1,7 +1,6 @@
 import numpy as np
 import sys
-
-sys.path.append("../../")
+from numba import njit
 
 from metric.metric import Euclid
 from .common import choose_reasonably_remote_partner
@@ -33,18 +32,23 @@ def max_dist_GNAT(ps, rng: np.random.Generator, budget=np.sqrt):
     return heu_com.max_dist_points(pivot_candidates)
 
 
-def incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
+def _select_IS_candidates(ps, budget):
+    # TODO: select initial candidates, object relations
+    piv_candidates = []
+
+    objects_lhs = []
+    objects_rhs = []
+    return piv_candidates, objects_lhs, objects_rhs
+
+
+def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
     """Chooses pivots that maximize the sum of the best lower bounds.
 
     This implements the strategy of the same name from a review paper.
 
     Review paper: zhuPivotSelectionAlgorithms2022
     """
-    # TODO: select initial candidates, object relations
-    piv_candidates = []
-
-    objects_lhs = []
-    objects_rhs = []
+    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(ps, budget)
 
     lb_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
     lb_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
@@ -64,6 +68,42 @@ def incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
     second_best_piv_idx = np.argmax(lbs_quality)
 
     return piv_candidates[best_pivot_idx], piv_candidates[second_best_piv_idx]
+
+
+def _argamax(a):
+    """Return index of largest scalar in array.
+    Like np.argmax, but for amax (the maximum along all axis)"""
+    return np.unravel_index(np.argmax(a.flatten()), a.shape)
+
+
+def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
+    """Chooses pivots that maximize the sum of the best lower bounds."""
+    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(ps, budget)
+
+    piv_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
+    piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
+    piv_piv = METRIC.distance_matrix(piv_candidates, piv_candidates)
+
+    lb_quality = _ptolemy_scores(piv_candidates, piv_lhs, piv_rhs, piv_piv)
+
+    p1, p2 = np.argamax(lb_quality)
+    return piv_candidates[p1], piv_candidates[p2]
+
+
+@njit
+def _ptolemy_scores(piv_candidates, piv_lhs, piv_rhs, piv_piv):
+    """Calculate the sum of Ptolemy's lower bounds"""
+    k = len(piv_candidates)
+    lb_quality = np.zeros((k, k))
+    for p1 in range(k):
+        for p2 in range(p1, k):
+            lb_quality[p1, p2] = (
+                np.abs(
+                    piv_lhs[p1, :] * piv_rhs[p2, :] - piv_lhs[p2, :] * piv_rhs[p1, :]
+                )
+                / piv_piv[p1, p2]
+            ).sum()
+    return lb_quality
 
 
 # TODO: find best scores simultaneously instead of iteratively
