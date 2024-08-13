@@ -19,8 +19,8 @@ def get_selection_algos(only_useful=False) -> dict[str, callable]:
         different_cluster_centers=heuristics.different_cluster_centers,
         approx_triangle_IS=lbsum.triangular_incremental_selection,
         opt_triangle_IS=lbsum.optimal_triangular_incremental_selection,
-        Ptolemy_IS=lbsum.ptolemys_incremental_selection,
-        opt_Ptolemy_IS=lbsum.ptolemy_optimal_selection,
+        approx_Ptolemy_IS=lbsum.ptolemys_incremental_selection,
+        # opt_Ptolemy_IS=lbsum.ptolemy_optimal_selection,
         hilbert_optimal=optimal.hilbert_optimal_pivots,
         ccs_optimal=optimal.ccs_optimal_pivot,
     )

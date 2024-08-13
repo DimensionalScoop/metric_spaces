@@ -3,6 +3,7 @@
 import numpy as np
 from numba import njit
 from itertools import permutations
+from warnings import warn
 
 from .common import METRIC
 
@@ -34,7 +35,6 @@ def optimal_triangular_incremental_selection(ps, rng=None):
     assert n_sampels > len(ps) ** 1.4 and n_sampels < len(ps) ** 2, n_sampels
 
     chosen_pivots = _find_incremental_triangular_pair(dist_lhs, dist_rhs)
-    print(chosen_pivots)
     return ps[chosen_pivots]
 
 
@@ -62,7 +62,6 @@ def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqr
     assert dist_lhs.shape == (len(piv_candidates), len(objects_lhs))
 
     chosen_pivots = _find_incremental_triangular_pair(dist_lhs, dist_rhs)
-    print(chosen_pivots)
     return piv_candidates[chosen_pivots]
 
 
@@ -90,13 +89,11 @@ def _find_incremental_triangular_pair(dist_lhs, dist_rhs):
 
 
 def ptolemy_optimal_selection(ps, rng=None):
+    warn("this method takes too long: it uses O(n^4) operations (n=len(ps))")
     dist_matrix = METRIC.distance_matrix(ps, ps)
 
     dist_lhs, dist_rhs, dist_matrix = _all_pairs_distances(ps)
-    all_pairs_idx = np.array(list(permutations(range(len(ps)), 2)))
-    # TODO: refactor: the _ptolemy_scores method does not need the piv_candidates at all
-    piv_candidates = np.vstack((ps[all_pairs_idx[:, 0]], ps[all_pairs_idx[:, 1]]))
-    lb_quality = _ptolemy_scores(piv_candidates, dist_lhs, dist_rhs, dist_matrix)
+    lb_quality = _ptolemy_scores(dist_lhs, dist_rhs, dist_matrix)
 
     p1, p2 = _argamax(lb_quality)
     return ps[p1], ps[p2]
@@ -110,23 +107,23 @@ def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt)
     piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
     piv_piv = METRIC.distance_matrix(piv_candidates, piv_candidates)
 
-    lb_quality = _ptolemy_scores(piv_candidates, piv_lhs, piv_rhs, piv_piv)
+    lb_quality = _ptolemy_scores(piv_lhs, piv_rhs, piv_piv)
 
     p1, p2 = _argamax(lb_quality)
     return piv_candidates[p1], piv_candidates[p2]
 
 
 @njit
-def _ptolemy_scores(piv_candidates, piv_lhs, piv_rhs, piv_piv):
+def _ptolemy_scores(piv_lhs, piv_rhs, piv_piv):
     """Calculate the sum of Ptolemy's lower bounds"""
-    k = len(piv_candidates)
+    k, _ = piv_piv.shape
     lb_quality = np.zeros((k, k))
+
     for p1 in range(k):
         for p2 in range(p1 + 1, k):
             lb_quality[p1, p2] = (
                 np.abs(
                     piv_lhs[p1, :] * piv_rhs[p2, :] - piv_lhs[p2, :] * piv_rhs[p1, :]
                 )
-                / piv_piv[p1, p2]
-            ).sum()
+            ).sum() / piv_piv[p1, p2]
     return lb_quality
