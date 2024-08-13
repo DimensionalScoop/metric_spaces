@@ -6,6 +6,12 @@ from numba import njit
 from .common import METRIC
 
 
+def _argamax(a):
+    """Return index of largest scalar in array.
+    Like np.argmax, but for amax (the maximum along all axis)"""
+    return np.unravel_index(np.argmax(a.flatten()), a.shape)
+
+
 def _select_IS_candidates(ps, budget, rng):
     n_candidates = int(budget(len(ps)))
     piv_candidates = rng.choice(ps, size=n_candidates, replace=False)
@@ -20,8 +26,19 @@ def _select_IS_candidates(ps, budget, rng):
     return piv_candidates, lhs, rhs
 
 
+def optimal_triangular_incremental_selection(ps, rng=None):
+    """Chooses two pivots that maximize the sum of the best lower bounds."""
+    piv_candidates = ps
+    dist_lhs = METRIC.distance_matrix(piv_candidates, ps)
+    dist_rhs = dist_lhs
+
+    chosen_pivots = _find_incremental_triangular_pair(dist_lhs, dist_rhs)
+    return piv_candidates[chosen_pivots]
+
+
 def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
-    """Chooses pivots that maximize the sum of the best lower bounds.
+    """Chooses two pivots that maximize the sum of the best lower bounds.
+    Subsamples from all points `ps` according to the budget.
 
     This implements the strategy of the same name from a review paper.
 
@@ -29,12 +46,15 @@ def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqr
     """
     piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(ps, budget, rng)
 
-    lb_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
-    lb_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
-    lower_bounds = np.abs(lb_lhs - lb_rhs)
+    dist_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
+    dist_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
 
-    # TODO: reafactor after here to extract main method, use in fast and complete version
+    chosen_pivots = _find_incremental_triangular_pair(dist_lhs, dist_rhs)
+    return piv_candidates[chosen_pivots]
 
+
+def _find_incremental_triangular_pair(dist_lhs, dist_rhs):
+    lower_bounds = np.abs(dist_lhs - dist_rhs)
     lbs_quality = np.sum(lower_bounds, axis=0)
     best_pivot_idx = np.argmax(lbs_quality)
 
@@ -48,13 +68,16 @@ def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqr
     lbs_quality = best_lbs.sum(axis=1)
     second_best_piv_idx = np.argmax(lbs_quality)
 
-    return piv_candidates[best_pivot_idx], piv_candidates[second_best_piv_idx]
+    return best_pivot_idx, second_best_piv_idx
 
 
-def _argamax(a):
-    """Return index of largest scalar in array.
-    Like np.argmax, but for amax (the maximum along all axis)"""
-    return np.unravel_index(np.argmax(a.flatten()), a.shape)
+def ptolemy_optimal_selection(ps, rng=None):
+    dist_matrix = METRIC.distance_matrix(ps, ps)
+
+    lb_quality = _ptolemy_scores(dist_matrix, dist_matrix, dist_matrix, dist_matrix)
+
+    p1, p2 = _argamax(lb_quality)
+    return ps[p1], ps[p2]
 
 
 def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
@@ -85,6 +108,3 @@ def _ptolemy_scores(piv_candidates, piv_lhs, piv_rhs, piv_piv):
                 / piv_piv[p1, p2]
             ).sum()
     return lb_quality
-
-
-# TODO: find best scores simultaneously instead of iteratively
