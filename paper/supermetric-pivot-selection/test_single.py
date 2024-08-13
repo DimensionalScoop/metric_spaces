@@ -36,12 +36,12 @@ from generate import point_generator
 
 # %%
 metric = Euclid(2)
-N_SAMPLES = 512 #512
+N_SAMPLES = 512
 DIM = 8
-SEED = 0xFEED1
+SEED = 0xFEED
 
-#GENERATOR = "gaussian, eliptic"
-GENERATOR = "clusters, overlapping"
+GENERATOR = "gaussian, eliptic"
+#GENERATOR = "clusters, overlapping"
 
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
@@ -54,7 +54,7 @@ r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
 # %%
 rv = []
 
-del piv_selectors["Ptolemy_IS"]
+#del piv_selectors["Ptolemy_IS"]
 
 for algo_name, select_pivots in tqdm(piv_selectors.items()):
     print(algo_name)
