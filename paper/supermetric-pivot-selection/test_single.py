@@ -23,6 +23,9 @@ import matplotlib.pyplot as plt
 
 import sys
 
+# %load_ext autoreload
+# %autoreload 3
+
 sys.path.append("../..")
 
 from tetrahedron import tetrahedron, proj_quality
@@ -34,10 +37,11 @@ from generate import point_generator
 # %%
 metric = Euclid(2)
 N_SAMPLES = 512
-DIM = 2
+DIM = 8
 SEED = 0xFEED
 
-GENERATOR = "gaussian, eliptic"
+#GENERATOR = "gaussian, eliptic"
+GENERATOR = "clusters, overlapping"
 
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
@@ -51,6 +55,7 @@ r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
 rv = []
 
 for algo_name, select_pivots in tqdm(piv_selectors.items()):
+    print(algo_name)
     try:
         p0, p1 = select_pivots(points, rng=rng)
 
@@ -69,11 +74,12 @@ for algo_name, select_pivots in tqdm(piv_selectors.items()):
     except ValueError:
         pass
 
-
-
 # %%
 df = pd.DataFrame(rv).sort_values("hilbert_quality").set_index("algorithm")
-display(df)
+try:
+    display(df)
+except NameError():
+    print(df)
 
 # %%
 plt.scatter(*points.T, marker="+")
