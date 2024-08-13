@@ -38,7 +38,7 @@ from generate import point_generator
 metric = Euclid(2)
 N_SAMPLES = 512
 DIM = 8
-SEED = 0xFEED
+SEED = 0xFEED1
 
 #GENERATOR = "gaussian, eliptic"
 GENERATOR = "clusters, overlapping"
