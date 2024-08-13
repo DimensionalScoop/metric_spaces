@@ -168,3 +168,4 @@ cython_debug/
 paper/supermetric-pivot-selection/results
 paper/indexability/explore.ipynb
 paper/supermetric-pivot-selection/create_paper_visuals.ipynb
+paper/supermetric-pivot-selection/test_single.ipynb

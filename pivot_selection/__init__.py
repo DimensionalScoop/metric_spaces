@@ -16,6 +16,8 @@ def get_selection_algos(only_useful=False) -> dict[str, callable]:
         remoteness=heuristics.two_remote_points,
         central_and_distant=heuristics.central_and_distant,
         different_cluster_centers=heuristics.different_cluster_centers,
+        triangle_IS=fast.triangular_incremental_selection,
+        Ptolemy_IS=fast.ptolemys_incremental_selection,
         hilbert_optimal=optimal.hilbert_optimal_pivots,
         ccs_optimal=optimal.ccs_optimal_pivot,
     )
