@@ -1,9 +1,7 @@
 import numpy as np
 
 from tetrahedron import tetrahedron, proj_quality
-from metric.metric import Euclid
-
-METRIC = Euclid(2)
+from .common import METRIC
 
 
 def __mask_diag(a):

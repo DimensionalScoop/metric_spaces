@@ -1,14 +1,6 @@
 import numpy as np
 
-import sys
-
-sys.path.append("../../")
-
-from metric.metric import Euclid
-from .common import choose_reasonably_remote_partner
-
-
-METRIC = Euclid(2)
+from .common import choose_reasonably_remote_partner, METRIC
 
 
 def __mask_diag(a):
