@@ -25,6 +25,10 @@ import seaborn as sns
 from joblib import delayed, Parallel
 from glob import glob
 from warnings import warn
+from tqdm.auto import tqdm
+
+import sys
+sys.path.append("../..")
 
 from tetrahedron import tetrahedron, proj_quality
 from metric.metric import Euclid
@@ -33,13 +37,39 @@ import pivot_selection
 from generate import point_generator
 
 # %%
-PATH = "paper/supermetric-pivot-selection/"
+# load the files with the expensive optimal results
+PATH = "" #"paper/supermetric-pivot-selection/"
 files = glob(PATH + "results/run-2/*.csv")
 files += [PATH + "results/deduplicated-run-1.csv"]
 df = pd.concat((pd.read_csv(f) for f in files))
 df = df.drop(columns=["Unnamed: 0"])
 df = df.drop_duplicates()
+df = df.query("algorithm in ['hilbert_optimal', 'ccs_optimal']")
 len(set(df.run))
+
+# %%
+# load additional files with cheaper results
+files = glob("../../"+ "results/fast-only/*.csv")
+add_df = pd.concat((pd.read_csv(f) for f in files)).drop(columns=["Unnamed: 0"])
+
+# %%
+left = df
+right = add_df
+
+# only keep rows that have the same index_cols in both frames
+index_cols = ["dim","dataset","seed","run"]
+
+merged = left.reset_index().merge(right.reset_index(), how="inner", on=index_cols)
+keep = merged[index_cols].drop_duplicates()
+
+left_keep = keep.merge(left, on=index_cols, how="left")
+right_keep = keep.merge(right, on=index_cols, how="left")
+result = pd.concat((left_keep, right_keep))
+
+algorithms_per_sample = result.groupby(index_cols).apply(len)
+assert len(set(algorithms_per_sample)), "There are a different number of algorithms per sample!"
+
+df = result
 
 # %%
 failed = df.query("note == 'failed'")
@@ -64,12 +94,12 @@ u
 # %%
 u = results.groupby(
     [
-        "dataset",
         "dim",
+        "dataset",
         "algorithm",
     ]
 ).apply(len, include_groups=False)
-assert len(set(u)) == 1
+assert len(set(u)) == 1, f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
 print(f"samples per (`dataset` x `dim` x `algorithm`) combination: {set(u)}")
 
 
@@ -114,17 +144,26 @@ normalized_res
 ex = normalized_res.query("dataset == 'univariate, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
 
+# %%
+set(result.algorithm)
+
 
 # %%
 def make_algos_human_readable(df):
     algo_map = dict(
+        maximize_dist="maximize dist",
+        
+        non_central_points="maximize var",
+        non_central_points_approx="maximize var approx",
+
+        approx_Ptolemy_IS="Ptolemy IS approx",
+        approx_triangle_IS="Triangle IS approx",
+
+        different_cluster_centers="different cluster centers",
+        
         random="random",
-        maximize_dist="maximize_dist",
-        non_central_points="maximize_var",
-        non_central_points_approx="maximize_approximated_var",
         ccs_optimal="optimal",
         hilbert_optimal="optimal",
-        different_cluster_centers="different_cluster_centers",
     )
     num_algos = len(set(df.algorithm))
     df["algorithm"] = df.algorithm.map(algo_map)
@@ -136,6 +175,111 @@ def make_algos_human_readable(df):
 ex = make_algos_human_readable(normalized_res.copy())
 ex = ex.query("dataset == 'univariate, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
+
+# %%
+normalized_res
+
+# %%
+# create tables
+
+DIM_RANGE = (5,10)
+def tabulate(value="hilbert", pivot_table=True):
+    if value == "hilbert":
+        quality = "hilbert_quality"
+        best = np.max
+    elif value == "css":
+        quality = "mean_candidate_set_size"
+        best = np.min
+    else:
+        raise NotImplementedError()
+
+    
+    df = normalized_res[
+        ~normalized_res.algorithm.isin([quality])
+    ]
+    df = make_algos_human_readable(df)
+    
+    def error_of_mean(rows):
+        return np.sqrt(np.std(rows, ddof=1) / len(rows))
+    result = df.query("dim >= @DIM_RANGE[0] and dim <= @DIM_RANGE[1]").groupby(["dataset", "algorithm"])[quality].agg(["mean", error_of_mean])
+    
+    assert (result["error_of_mean"] < 0.5).all(), "Errors to high, disable results rounding and include errors!"
+    result = result.drop(columns="error_of_mean")
+    
+    result = result.drop(index="optimal", level=1)
+
+    
+    #result["mean"] = np.round(result["mean"],0)
+    
+
+    if pivot_table:
+        result = result.reset_index().pivot(values="mean", columns="algorithm", index="dataset")
+        
+        return result #.to_latex(escape=False)
+    else:
+        result = result.reset_index().sort_values(["dataset","mean"], ascending=False)
+        result = result.set_index(["dataset","algorithm"])
+        return result
+
+tabulate()
+
+
+# %%
+def style_pivot_table(
+    df,
+    output_file,
+    highlighter="max",
+    caption="",
+):
+    styler = df.style.format("{:.0f}")
+    if highlighter == "max":
+        styler = styler.highlight_max(props='bfseries:;', axis=1)
+    elif highlighter == "min":
+        styler = styler.highlight_min(props='bfseries:;', axis=1)
+    else:
+        raise NotImplementedError()
+    
+    # Generate LaTeX table
+    latex_table = styler.to_latex(
+        caption=caption,
+        position="h",
+        position_float="centering",
+        hrules=True,
+        siunitx=True,
+    )
+    
+    latex_table = (latex_table
+                   .replace("{tabular}","{tabularx}")
+                   .replace("\\begin{tabularx}","\\begin{tabularx}{\\textwidth}")
+                   .replace("{table}","{table*}")
+                  )
+    
+    with open(output_file,"w") as f:
+        f.write(latex_table)
+
+s_dim_range = "\\numrange{" + f"{DIM_RANGE[0]}" + "}{" + f"{DIM_RANGE[1]}"+ "}"
+style_pivot_table(
+    tabulate("hilbert"),
+    "fig/hilbert_table.tex",
+    highlighter="max",
+    caption="""Relative useful partition size, averaged over dimensions """+s_dim_range+""".
+        The sizes are given as the difference to the size achievable with a optimal pivot choice on the dataset, i.e. a size of zero would be optimal.
+        The best partition size for each dataset is indicated in bold.
+        """,
+)
+
+style_pivot_table(
+    tabulate("css"),
+    "fig/css_table.tex",
+    highlighter="min",
+    caption="""Relative mean candidate set size, averaged over dimensions """+s_dim_range+""".
+        The sizes are given as the difference to the size achievable with a optimal pivot choice on the dataset, i.e. a size of zero would be optimal.
+        The best partition size for each dataset is indicated in bold.
+        """,
+)
+    
+
+# %%
 
 # %%
 from matplotlib import rc, rcParams

@@ -80,13 +80,13 @@ def compare_projections(
 
 
 # wait to manually change nice levels before starting subprocesses
-time.sleep(10)
+# time.sleep(10)
 
 metric = Euclid(2)
 N_RUNS = 8
 N_SAMPLES = 512
 DIMS = range(2, 18)
-N_CPUS = 64
+N_CPUS = 10  # 64
 SEED_OFFSET = 3710_000
 # if you calculated the optimal stuff beforehand, set this to true for massive speedups
 SKIP_OPTIMAL_SELECTORS = True
@@ -97,6 +97,7 @@ piv_selectors = pivot_selection.get_selection_algos(True)
 if SKIP_OPTIMAL_SELECTORS:
     del piv_selectors["hilbert_optimal"]
     del piv_selectors["ccs_optimal"]
+    del piv_selectors["opt_triangle_IS"]
 
 
 def run_task(run_id, dim):
@@ -105,7 +106,7 @@ def run_task(run_id, dim):
         piv_selectors,
         [dim],
         seed=100 * run_id + dim,
-        errors="skip",
+        errors="raise",
         verbose=False,
     )
     r["run"] = run_id
@@ -125,5 +126,5 @@ for run_id in range(0, 100_000, N_RUNS):
 
     notes = "-optimal_skipped" if SKIP_OPTIMAL_SELECTORS else ""
     results.to_csv(
-        f"results/results_{run_id}-to-{run_id+N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
+        f"results/fast-only/results_{run_id}-to-{run_id+N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
     )

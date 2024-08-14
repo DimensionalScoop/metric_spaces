@@ -36,6 +36,7 @@ def _select_IS_candidates(ps, n_pivs, n_points, rng):
 
 def optimal_triangular_incremental_selection(ps, rng=None):
     """Chooses two pivots that maximize the sum of the best lower bounds."""
+    # XXX: this uses way more memory than it needs to
     dist_lhs, dist_rhs, _ = _all_pairs_distances(ps)
     n_pivs, n_sampels = dist_lhs.shape
     assert n_sampels > len(ps) ** 1.4 and n_sampels < len(ps) ** 2, n_sampels
@@ -120,6 +121,7 @@ def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt)
         ps, n_pivs, n_points, rng
     )
 
+    # XXX: this uses way more memory than it needs to
     piv_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
     piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
     piv_piv = METRIC.distance_matrix(piv_candidates, piv_candidates)
