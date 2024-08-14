@@ -40,7 +40,7 @@ from generate import point_generator
 # %%
 # load the files with the expensive optimal results
 PATH = "paper/supermetric-pivot-selection/results/"
-OUT_PATH = "paper/supermetric-pivot-selection/results/"
+OUT_PATH = "paper/supermetric-pivot-selection/fig/"
 files = glob(PATH + "run-2/*.csv")
 files += [PATH + "deduplicated-run-1.csv"]
 df = pd.concat((pd.read_csv(f) for f in files))
@@ -161,6 +161,7 @@ def make_algos_human_readable(df):
         non_central_points="maximize var",
         non_central_points_approx="maximize var approx",
         approx_Ptolemy_IS="Ptolemy IS approx",
+        approx_cheap_Ptolemy_IS="Ptolemy IS approx cheap",
         approx_triangle_IS="Triangle IS approx",
         different_cluster_centers="different cluster centers",
         random="random",
@@ -177,9 +178,6 @@ def make_algos_human_readable(df):
 ex = make_algos_human_readable(normalized_res.copy())
 ex = ex.query("dataset == 'univariate, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
-
-# %%
-normalized_res
 
 # %%
 # create tables
@@ -255,6 +253,7 @@ def style_pivot_table(
         position_float="centering",
         hrules=True,
         siunitx=True,
+        column_format="l" + "X" * len(styler.columns),
     )
 
     latex_table = (
@@ -264,6 +263,7 @@ def style_pivot_table(
     )
 
     with open(output_file, "w") as f:
+        f.write("% This is a generated file. Manual edits will be overwritten\n")
         f.write(latex_table)
 
 
