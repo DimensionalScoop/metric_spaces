@@ -91,6 +91,8 @@ SEED_OFFSET = 3710_000
 # if you calculated the optimal stuff beforehand, set this to true for massive speedups
 SKIP_OPTIMAL_SELECTORS = True
 
+PATH = "paper/supermetric-pivot-selection/results/"
+
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
 
@@ -126,5 +128,5 @@ for run_id in range(0, 100_000, N_RUNS):
 
     notes = "-optimal_skipped" if SKIP_OPTIMAL_SELECTORS else ""
     results.to_csv(
-        f"results/fast-only/results_{run_id}-to-{run_id+N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
+        f"{PATH}fast-only/results_{run_id}-to-{run_id+N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
     )

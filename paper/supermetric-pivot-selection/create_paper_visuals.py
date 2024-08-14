@@ -28,6 +28,7 @@ from warnings import warn
 from tqdm.auto import tqdm
 
 import sys
+
 sys.path.append("../..")
 
 from tetrahedron import tetrahedron, proj_quality
@@ -38,9 +39,10 @@ from generate import point_generator
 
 # %%
 # load the files with the expensive optimal results
-PATH = "" #"paper/supermetric-pivot-selection/"
-files = glob(PATH + "results/run-2/*.csv")
-files += [PATH + "results/deduplicated-run-1.csv"]
+PATH = "paper/supermetric-pivot-selection/results/"
+OUT_PATH = "paper/supermetric-pivot-selection/results/"
+files = glob(PATH + "run-2/*.csv")
+files += [PATH + "deduplicated-run-1.csv"]
 df = pd.concat((pd.read_csv(f) for f in files))
 df = df.drop(columns=["Unnamed: 0"])
 df = df.drop_duplicates()
@@ -49,7 +51,7 @@ len(set(df.run))
 
 # %%
 # load additional files with cheaper results
-files = glob("../../"+ "results/fast-only/*.csv")
+files = glob(PATH + "fast-only/*.csv")
 add_df = pd.concat((pd.read_csv(f) for f in files)).drop(columns=["Unnamed: 0"])
 
 # %%
@@ -57,7 +59,7 @@ left = df
 right = add_df
 
 # only keep rows that have the same index_cols in both frames
-index_cols = ["dim","dataset","seed","run"]
+index_cols = ["dim", "dataset", "seed", "run"]
 
 merged = left.reset_index().merge(right.reset_index(), how="inner", on=index_cols)
 keep = merged[index_cols].drop_duplicates()
@@ -67,7 +69,9 @@ right_keep = keep.merge(right, on=index_cols, how="left")
 result = pd.concat((left_keep, right_keep))
 
 algorithms_per_sample = result.groupby(index_cols).apply(len)
-assert len(set(algorithms_per_sample)), "There are a different number of algorithms per sample!"
+assert len(
+    set(algorithms_per_sample)
+), "There are a different number of algorithms per sample!"
 
 df = result
 
@@ -99,7 +103,9 @@ u = results.groupby(
         "algorithm",
     ]
 ).apply(len, include_groups=False)
-assert len(set(u)) == 1, f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
+assert (
+    len(set(u)) == 1
+), f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
 print(f"samples per (`dataset` x `dim` x `algorithm`) combination: {set(u)}")
 
 
@@ -152,15 +158,11 @@ set(result.algorithm)
 def make_algos_human_readable(df):
     algo_map = dict(
         maximize_dist="maximize dist",
-        
         non_central_points="maximize var",
         non_central_points_approx="maximize var approx",
-
         approx_Ptolemy_IS="Ptolemy IS approx",
         approx_triangle_IS="Triangle IS approx",
-
         different_cluster_centers="different cluster centers",
-        
         random="random",
         ccs_optimal="optimal",
         hilbert_optimal="optimal",
@@ -182,7 +184,9 @@ normalized_res
 # %%
 # create tables
 
-DIM_RANGE = (5,10)
+DIM_RANGE = (5, 10)
+
+
 def tabulate(value="hilbert", pivot_table=True):
     if value == "hilbert":
         quality = "hilbert_quality"
@@ -193,33 +197,38 @@ def tabulate(value="hilbert", pivot_table=True):
     else:
         raise NotImplementedError()
 
-    
-    df = normalized_res[
-        ~normalized_res.algorithm.isin([quality])
-    ]
+    df = normalized_res[~normalized_res.algorithm.isin([quality])]
     df = make_algos_human_readable(df)
-    
+
     def error_of_mean(rows):
         return np.sqrt(np.std(rows, ddof=1) / len(rows))
-    result = df.query("dim >= @DIM_RANGE[0] and dim <= @DIM_RANGE[1]").groupby(["dataset", "algorithm"])[quality].agg(["mean", error_of_mean])
-    
-    assert (result["error_of_mean"] < 0.5).all(), "Errors to high, disable results rounding and include errors!"
+
+    result = (
+        df.query("dim >= @DIM_RANGE[0] and dim <= @DIM_RANGE[1]")
+        .groupby(["dataset", "algorithm"])[quality]
+        .agg(["mean", error_of_mean])
+    )
+
+    assert (
+        result["error_of_mean"] < 0.5
+    ).all(), "Errors to high, disable results rounding and include errors!"
     result = result.drop(columns="error_of_mean")
-    
+
     result = result.drop(index="optimal", level=1)
 
-    
-    #result["mean"] = np.round(result["mean"],0)
-    
+    # result["mean"] = np.round(result["mean"],0)
 
     if pivot_table:
-        result = result.reset_index().pivot(values="mean", columns="algorithm", index="dataset")
-        
-        return result #.to_latex(escape=False)
+        result = result.reset_index().pivot(
+            values="mean", columns="algorithm", index="dataset"
+        )
+
+        return result  # .to_latex(escape=False)
     else:
-        result = result.reset_index().sort_values(["dataset","mean"], ascending=False)
-        result = result.set_index(["dataset","algorithm"])
+        result = result.reset_index().sort_values(["dataset", "mean"], ascending=False)
+        result = result.set_index(["dataset", "algorithm"])
         return result
+
 
 tabulate()
 
@@ -233,12 +242,12 @@ def style_pivot_table(
 ):
     styler = df.style.format("{:.0f}")
     if highlighter == "max":
-        styler = styler.highlight_max(props='bfseries:;', axis=1)
+        styler = styler.highlight_max(props="bfseries:;", axis=1)
     elif highlighter == "min":
-        styler = styler.highlight_min(props='bfseries:;', axis=1)
+        styler = styler.highlight_min(props="bfseries:;", axis=1)
     else:
         raise NotImplementedError()
-    
+
     # Generate LaTeX table
     latex_table = styler.to_latex(
         caption=caption,
@@ -247,22 +256,25 @@ def style_pivot_table(
         hrules=True,
         siunitx=True,
     )
-    
-    latex_table = (latex_table
-                   .replace("{tabular}","{tabularx}")
-                   .replace("\\begin{tabularx}","\\begin{tabularx}{\\textwidth}")
-                   .replace("{table}","{table*}")
-                  )
-    
-    with open(output_file,"w") as f:
+
+    latex_table = (
+        latex_table.replace("{tabular}", "{tabularx}")
+        .replace("\\begin{tabularx}", "\\begin{tabularx}{\\textwidth}")
+        .replace("{table}", "{table*}")
+    )
+
+    with open(output_file, "w") as f:
         f.write(latex_table)
 
-s_dim_range = "\\numrange{" + f"{DIM_RANGE[0]}" + "}{" + f"{DIM_RANGE[1]}"+ "}"
+
+s_dim_range = "\\numrange{" + f"{DIM_RANGE[0]}" + "}{" + f"{DIM_RANGE[1]}" + "}"
 style_pivot_table(
     tabulate("hilbert"),
-    "fig/hilbert_table.tex",
+    OUT_PATH + "hilbert_table.tex",
     highlighter="max",
-    caption="""Relative useful partition size, averaged over dimensions """+s_dim_range+""".
+    caption="""Relative useful partition size, averaged over dimensions """
+    + s_dim_range
+    + """.
         The sizes are given as the difference to the size achievable with a optimal pivot choice on the dataset, i.e. a size of zero would be optimal.
         The best partition size for each dataset is indicated in bold.
         """,
@@ -270,14 +282,16 @@ style_pivot_table(
 
 style_pivot_table(
     tabulate("css"),
-    "fig/css_table.tex",
+    OUT_PATH + "css_table.tex",
     highlighter="min",
-    caption="""Relative mean candidate set size, averaged over dimensions """+s_dim_range+""".
+    caption="""Relative mean candidate set size, averaged over dimensions """
+    + s_dim_range
+    + """.
         The sizes are given as the difference to the size achievable with a optimal pivot choice on the dataset, i.e. a size of zero would be optimal.
         The best partition size for each dataset is indicated in bold.
         """,
 )
-    
+
 
 # %%
 
@@ -332,7 +346,7 @@ def plot_hilbert():
 
     # g.set(ylim=(-0.05, 1.1))
     g.add_legend()
-    g.savefig(PATH + "fig/partition.pdf")
+    g.savefig(OUT_PATH + "partition.pdf")
 
     return g
 
@@ -375,7 +389,7 @@ def plot_css():
 
     # g.set(ylim=(-0.05, 1.1))
     # g.add_legend()
-    g.savefig(PATH + "fig/css.pdf")
+    g.savefig(OUT_PATH + "css.pdf")
     return g
 
 
@@ -386,7 +400,7 @@ plt.clf()
 pw.overwrite_axisgrid()
 g0 = pw.load_seaborngrid(plot_hilbert(), label="g0")
 g1 = pw.load_seaborngrid(plot_css(), label="g1")
-(g1 | g0).savefig(PATH + "fig/results.pdf")
+(g1 | g0).savefig(OUT_PATH + "results.pdf")
 plt.clf()
 
 # %%
