@@ -132,6 +132,34 @@ def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt)
     return piv_candidates[p1], piv_candidates[p2]
 
 
+def ptolemys_incremental_selection_n15_budget(ps, rng: np.random.Generator):
+    """Chooses pivots that maximize the sum of the best lower bounds.
+
+    This method limits the number of dist evals to O(n) and the
+    number of general evals to O(n^1.5).
+    """
+
+    # runtime: O(pivots^2 + pivots * points) distances
+    #          O(pivots^2 * points) other ops
+    n = len(ps)
+    n_pivs = int(np.sqrt(n))
+    n_points = int(np.sqrt(n))
+    # O(n) dists + O(n^1.5) overhead
+    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(
+        ps, n_pivs, n_points, rng
+    )
+
+    # XXX: this uses way more memory than it needs to
+    piv_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
+    piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
+    piv_piv = METRIC.distance_matrix(piv_candidates, piv_candidates)
+
+    lb_quality = _ptolemy_scores(piv_lhs, piv_rhs, piv_piv)
+
+    p1, p2 = _argamax(lb_quality)
+    return piv_candidates[p1], piv_candidates[p2]
+
+
 @njit
 def _ptolemy_scores(piv_lhs, piv_rhs, piv_piv):
     """Calculate the sum of Ptolemy's lower bounds"""
