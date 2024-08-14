@@ -14,15 +14,21 @@ def _argamax(a):
     return np.unravel_index(np.argmax(a.flatten()), a.shape)
 
 
-def _select_IS_candidates(ps, budget, rng):
-    n_candidates = int(budget(len(ps)))
-    piv_candidates = rng.choice(ps, size=n_candidates, replace=False)
+def _all_pairs_distances(ps):
+    all_dists = METRIC.distance_matrix(ps, ps)
+    # look at all pairs from the POV of all pivots
+    all_pairs_idx = np.array(list(permutations(range(len(ps)), 2)))
+    dist_lhs = all_dists[:, all_pairs_idx[:, 0]]
+    dist_rhs = all_dists[:, all_pairs_idx[:, 1]]
+    return dist_lhs, dist_rhs, all_dists
+
+
+def _select_IS_candidates(ps, n_pivs, n_points, rng):
+    piv_candidates = rng.choice(ps, size=n_pivs, replace=False)
 
     # choose distance pairs without using any pair twice
     valid_permutations = np.array(np.triu_indices(len(ps), k=-1)).T
-    pairs_idx = rng.choice(
-        range(len(valid_permutations)), size=n_candidates, replace=False
-    )
+    pairs_idx = rng.choice(range(len(valid_permutations)), size=n_points, replace=False)
     lhs = ps[valid_permutations[pairs_idx, 0]]
     rhs = ps[valid_permutations[pairs_idx, 1]]
     return piv_candidates, lhs, rhs
@@ -38,13 +44,7 @@ def optimal_triangular_incremental_selection(ps, rng=None):
     return ps[chosen_pivots]
 
 
-def _all_pairs_distances(ps):
-    all_dists = METRIC.distance_matrix(ps, ps)
-    # look at all pairs from the POV of all pivots
-    all_pairs_idx = np.array(list(permutations(range(len(ps)), 2)))
-    dist_lhs = all_dists[:, all_pairs_idx[:, 0]]
-    dist_rhs = all_dists[:, all_pairs_idx[:, 1]]
-    return dist_lhs, dist_rhs, all_dists
+# TODO: change budget to total budget
 
 
 def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
@@ -55,7 +55,13 @@ def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqr
 
     Review paper: zhuPivotSelectionAlgorithms2022
     """
-    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(ps, budget, rng)
+    # runtime: O(pivots * points), distribute evenly
+    budget = len(ps) * budget(len(ps))
+    n_pivs = int(np.sqrt(budget))
+    n_points = int(np.sqrt(budget))
+    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(
+        ps, n_pivs, n_points, rng
+    )
 
     dist_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
     dist_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
@@ -101,7 +107,18 @@ def ptolemy_optimal_selection(ps, rng=None):
 
 def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
     """Chooses pivots that maximize the sum of the best lower bounds."""
-    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(ps, budget, rng)
+
+    # runtime: O(pivots^2 + pivots * points) distances
+    #          O(pivots^2 * points) other ops
+    # → for budget = np.sqrt, complexity should be O(n^1.5)
+    # pivots = sqrt(n), points = n, other ops in O(n^2)
+
+    budget = (len(ps) * budget(len(ps))) ** (1 / 1.5)
+    n_pivs = int(np.sqrt(budget))
+    n_points = int(budget)
+    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(
+        ps, n_pivs, n_points, rng
+    )
 
     piv_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
     piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
