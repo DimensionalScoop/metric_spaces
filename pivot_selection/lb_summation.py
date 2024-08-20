@@ -5,172 +5,152 @@ from numba import njit
 from itertools import permutations
 from warnings import warn
 
+from typing import Literal
+
 from .common import METRIC
 
 
-def _argamax(a):
-    """Return index of largest scalar in array.
-    Like np.argmax, but for amax (the maximum along all axis)"""
-    return np.unravel_index(np.argmax(a.flatten()), a.shape)
+def IS(
+    ps,
+    n_pivs,
+    n_pairs,
+    rng: np.random.Generator,
+    lb_type: Literal["tri", "pto"] = "tri",
+    fixed_first_pivot=False,
+):
+    """Maximize the sum of distances of the lower-bound approximation, using two pivots.
+    Returns the best pivot pair.
+
+    n_pivs: number of pivot candidates
+    n_objects: number of objects to approximate the distance between
+    lb_type: Triangle or Ptolemaic lower bound?
+    fixed_fist_pivot: fix one pivot for speedup?
+
+    if lb_type == "tri": dist_calcs = O(n_pivs * n_objects)
+    if lb_type == "pto": dist-calcs = O(n_pivs * n_objects + n_pivs**2)
+
+    match (lb_type, fixed_first_pivot):
+    if fixed_first_pivot:
+        complexity: O(n_pivs * n_objects**2)
+    else:
+        complexity: O(n_pivs**2 * n_objects**2)
+
+    Review paper: zhuPivotSelectionAlgorithms2022
+    """
+    piv_cand, lhs, rhs = _choose_pivs_and_pairs(rng, ps, n_pivs, n_pairs)
+
+    cached_distances = dict(
+        d_piv_lhs=METRIC.distance_matrix(piv_cand, lhs),
+        d_piv_rhs=METRIC.distance_matrix(piv_cand, rhs),
+    )
+    if lb_type == "pto":
+        cached_distances["d_piv_piv"] = METRIC.distance_matrix(piv_cand, piv_cand)
+
+    def choose_algo():
+        match (lb_type, fixed_first_pivot):
+            case "tri", False:
+                return _IS_tri
+            case "pto", False:
+                return _IS_pto
+            case "tri", True:
+                return _IS_tri_fixed_first_pivot
+            case "pto", True:
+                return _IS_pto_fixed_first_pivot
+            case _:
+                raise ValueError(f"Unknown combination {lb_type}, {fixed_first_pivot}")
+
+    get_best_pair = choose_algo()
+    p0, p1 = get_best_pair(**cached_distances)
+
+    if fixed_first_pivot:
+        assert p0 == 0
+    return piv_cand[p0], piv_cand[p1]
 
 
-def _all_pairs_distances(ps):
-    all_dists = METRIC.distance_matrix(ps, ps)
-    # look at all pairs from the POV of all pivots
-    all_pairs_idx = np.array(list(permutations(range(len(ps)), 2)))
-    dist_lhs = all_dists[:, all_pairs_idx[:, 0]]
-    dist_rhs = all_dists[:, all_pairs_idx[:, 1]]
-    return dist_lhs, dist_rhs, all_dists
+def _choose_pivs_and_pairs(rng, ps, n_pivs, n_pairs):
+    ps = rng.choice(ps, len(ps), replace=False)
+    piv_candidates = ps[:n_pivs]
+    objs = ps[n_pivs:]
 
-
-def _select_IS_candidates(ps, n_pivs, n_points, rng):
-    piv_candidates = rng.choice(ps, size=n_pivs, replace=False)
-
-    # choose distance pairs without using any pair twice
-    valid_permutations = np.array(np.triu_indices(len(ps), k=-1)).T
-    pairs_idx = rng.choice(range(len(valid_permutations)), size=n_points, replace=False)
+    # choose pairs
+    valid_permutations = np.array(np.triu_indices(len(objs), k=-1)).T
+    pairs_idx = rng.choice(range(len(valid_permutations)), size=n_pairs, replace=False)
     lhs = ps[valid_permutations[pairs_idx, 0]]
     rhs = ps[valid_permutations[pairs_idx, 1]]
     return piv_candidates, lhs, rhs
 
 
-def optimal_triangular_incremental_selection(ps, rng=None):
-    """Chooses two pivots that maximize the sum of the best lower bounds."""
-    # XXX: this uses way more memory than it needs to
-    dist_lhs, dist_rhs, _ = _all_pairs_distances(ps)
-    n_pivs, n_sampels = dist_lhs.shape
-    assert n_sampels > len(ps) ** 1.4 and n_sampels < len(ps) ** 2, n_sampels
+@njit
+def _IS_tri(d_piv_lhs, d_piv_rhs):
+    """Calculate the quality of the triangle lower bound approximation.
+    Returns the indices of the pivot pair with the highest quality.
 
-    chosen_pivots = _find_incremental_triangular_pair(dist_lhs, dist_rhs)
-    return ps[chosen_pivots]
-
-
-# TODO: change budget to total budget
-
-
-def triangular_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
-    """Chooses two pivots that maximize the sum of the best lower bounds.
-    Subsamples from all points `ps` according to the budget.
-
-    This implements the strategy of the same name from a review paper.
-
-    Review paper: zhuPivotSelectionAlgorithms2022
+    d_piv_lhs: distance matrix between pivots and left object
+    d_piv_rhs: distance matrix between pivots and right object
     """
-    # runtime: O(pivots * points), distribute evenly
-    budget = len(ps) * budget(len(ps))
-    n_pivs = int(np.sqrt(budget))
-    n_points = int(np.sqrt(budget))
-    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(
-        ps, n_pivs, n_points, rng
-    )
+    n_pivs, n_pairs = d_piv_lhs.shape
+    lb_quality = np.zeros([n_pivs] * 2)
 
-    dist_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
-    dist_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
-    assert dist_lhs.shape == (len(piv_candidates), len(objects_lhs))
+    for piv0 in range(n_pivs):
+        for piv1 in range(piv0 + 1, n_pivs):
+            for pair in range(n_pairs):
+                a = np.abs(d_piv_lhs[piv0, pair] - d_piv_rhs[piv0, pair])
+                b = np.abs(d_piv_lhs[piv1, pair] - d_piv_rhs[piv1, pair])
+                lb_quality[piv0, piv1] += max(a, b)
 
-    chosen_pivots = _find_incremental_triangular_pair(dist_lhs, dist_rhs)
-    return piv_candidates[chosen_pivots]
-
-
-def _find_incremental_triangular_pair(dist_lhs, dist_rhs):
-    n_pivs, n_samples = dist_lhs.shape
-
-    lower_bounds = np.abs(dist_lhs - dist_rhs)
-    lbs_quality = np.sum(lower_bounds, axis=1)
-    assert len(lbs_quality) == n_pivs
-    best_pivot_idx = np.argmax(lbs_quality)
-
-    lb_of_best_pivot = lower_bounds[best_pivot_idx]
-    lb_of_other_pivots = (
-        lower_bounds  # we can ignore that `best_pivot_idx` is included here
-    )
-
-    # choose the best available LB: use either the best pivot or the other pivot, for each pivot
-    best_lbs = np.fmax(lb_of_best_pivot.reshape(1, -1), lb_of_other_pivots)
-    assert best_lbs.shape == (n_pivs, n_samples)
-    lbs_quality = best_lbs.sum(axis=1)
-    second_best_piv_idx = np.argmax(lbs_quality)
-    assert second_best_piv_idx != best_pivot_idx
-
-    return np.array([best_pivot_idx, second_best_piv_idx])
-
-
-def ptolemy_optimal_selection(ps, rng=None):
-    warn("this method takes too long: it uses O(n^4) operations (n=len(ps))")
-    dist_matrix = METRIC.distance_matrix(ps, ps)
-
-    dist_lhs, dist_rhs, dist_matrix = _all_pairs_distances(ps)
-    lb_quality = _ptolemy_scores(dist_lhs, dist_rhs, dist_matrix)
-
-    p1, p2 = _argamax(lb_quality)
-    return ps[p1], ps[p2]
-
-
-def ptolemys_incremental_selection(ps, rng: np.random.Generator, budget=np.sqrt):
-    """Chooses pivots that maximize the sum of the best lower bounds."""
-
-    # runtime: O(pivots^2 + pivots * points) distances
-    #          O(pivots^2 * points) other ops
-    # → for budget = np.sqrt, complexity should be O(n^1.5)
-    # pivots = sqrt(n), points = n, other ops in O(n^2)
-
-    budget = (len(ps) * budget(len(ps))) ** (1 / 1.5)
-    n_pivs = int(np.sqrt(budget))
-    n_points = int(budget)
-    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(
-        ps, n_pivs, n_points, rng
-    )
-
-    # XXX: this uses way more memory than it needs to
-    piv_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
-    piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
-    piv_piv = METRIC.distance_matrix(piv_candidates, piv_candidates)
-
-    lb_quality = _ptolemy_scores(piv_lhs, piv_rhs, piv_piv)
-
-    p1, p2 = _argamax(lb_quality)
-    return piv_candidates[p1], piv_candidates[p2]
-
-
-def ptolemys_incremental_selection_n15_budget(ps, rng: np.random.Generator):
-    """Chooses pivots that maximize the sum of the best lower bounds.
-
-    This method limits the number of dist evals to O(n) and the
-    number of general evals to O(n^1.5).
-    """
-
-    # runtime: O(pivots^2 + pivots * points) distances
-    #          O(pivots^2 * points) other ops
-    n = len(ps)
-    n_pivs = int(np.sqrt(n))
-    n_points = int(np.sqrt(n))
-    # O(n) dists + O(n^1.5) overhead
-    piv_candidates, objects_lhs, objects_rhs = _select_IS_candidates(
-        ps, n_pivs, n_points, rng
-    )
-
-    # XXX: this uses way more memory than it needs to
-    piv_lhs = METRIC.distance_matrix(piv_candidates, objects_lhs)
-    piv_rhs = METRIC.distance_matrix(piv_candidates, objects_rhs)
-    piv_piv = METRIC.distance_matrix(piv_candidates, piv_candidates)
-
-    lb_quality = _ptolemy_scores(piv_lhs, piv_rhs, piv_piv)
-
-    p1, p2 = _argamax(lb_quality)
-    return piv_candidates[p1], piv_candidates[p2]
+    p0, p1 = np.amax(lb_quality)
+    return p0, p1
 
 
 @njit
-def _ptolemy_scores(piv_lhs, piv_rhs, piv_piv):
-    """Calculate the sum of Ptolemy's lower bounds"""
-    k, _ = piv_piv.shape
-    lb_quality = np.zeros((k, k))
+def _IS_tri_fixed_first_pivot(d_piv_lhs, d_piv_rhs):
+    n_pivs, n_pairs = d_piv_lhs.shape
+    lb_quality = np.zeros([1, n_pivs])
 
-    for p1 in range(k):
-        for p2 in range(p1 + 1, k):
-            lb_quality[p1, p2] = (
+    piv0 = 0
+    for piv1 in range(piv0 + 1, n_pivs):
+        for pair in range(n_pairs):
+            a = np.abs(d_piv_lhs[piv0, pair] - d_piv_rhs[piv0, pair])
+            b = np.abs(d_piv_lhs[piv1, pair] - d_piv_rhs[piv1, pair])
+            lb_quality[piv0, piv1] += max(a, b)
+
+    p0, p1 = np.amax(lb_quality)
+    return p0, p1
+
+
+@njit
+def _IS_pto(d_piv_lhs, d_piv_rhs, d_piv_piv):
+    """Calculate the sum of Ptolemy's lower bounds"""
+    n_pivs, n_pairs = d_piv_lhs.shape
+    lb_quality = np.zeros((n_pivs, n_pivs))
+
+    for p0 in range(n_pivs):
+        for p1 in range(p0 + 1, n_pivs):
+            lb_quality[p0, p1] = (
                 np.abs(
-                    piv_lhs[p1, :] * piv_rhs[p2, :] - piv_lhs[p2, :] * piv_rhs[p1, :]
+                    d_piv_lhs[p0, :] * d_piv_rhs[p1, :]
+                    - d_piv_lhs[p1, :] * d_piv_rhs[p0, :]
                 )
-            ).sum() / piv_piv[p1, p2]
-    return lb_quality
+            ).sum() / d_piv_piv[p0, p1]
+
+    p0, p1 = np.amax(lb_quality)
+    return p0, p1
+
+
+@njit
+def _IS_pto_fixed_first_pivot(d_piv_lhs, d_piv_rhs, d_piv_piv):
+    """Calculate the sum of Ptolemy's lower bounds"""
+    n_pivs, n_pairs = d_piv_lhs.shape
+    lb_quality = np.zeros((1, n_pivs))
+
+    p0 = 0
+    for p1 in range(p0 + 1, n_pivs):
+        lb_quality[p0, p1] = (
+            np.abs(
+                d_piv_lhs[p0, :] * d_piv_rhs[p1, :]
+                - d_piv_lhs[p1, :] * d_piv_rhs[p0, :]
+            )
+        ).sum() / d_piv_piv[p0, p1]
+
+    p0, p1 = np.amax(lb_quality)
+    return p0, p1
