@@ -79,11 +79,31 @@ def _choose_pivs_and_pairs(rng, ps, n_pivs, n_pairs):
     return piv_candidates, lhs, rhs
 
 
+# This was the original function. Sadly, numba can't call unravel_index :c
+# def _argamax(a):
+#     """Return index of largest scalar in array.
+#     Like np.argmax, but for amax (the maximum along all axis)"""
+#     return np.unravel_index(np.argmax(a.flatten()), a.shape)
+
+
 @njit
 def _argamax(a):
     """Return index of largest scalar in array.
     Like np.argmax, but for amax (the maximum along all axis)"""
-    return np.unravel_index(np.argmax(a.flatten()), a.shape)
+
+    # we don't support anything other than matrices
+    n_i, n_j = a.shape
+
+    largest = a[0, 0]
+    largest_i = 0
+    largest_j = 0
+    for i in range(n_i):
+        for j in range(n_j):
+            if a[i, j] > largest:
+                largest_i = i
+                largest_j = j
+                largest = a[i, j]
+    return largest_i, largest_j
 
 
 @njit
@@ -95,7 +115,7 @@ def _IS_tri(d_piv_lhs, d_piv_rhs):
     d_piv_rhs: distance matrix between pivots and right object
     """
     n_pivs, n_pairs = d_piv_lhs.shape
-    lb_quality = np.zeros([n_pivs] * 2)
+    lb_quality = np.zeros((n_pivs, n_pivs))
 
     for piv0 in range(n_pivs):
         for piv1 in range(piv0 + 1, n_pivs):
@@ -111,16 +131,16 @@ def _IS_tri(d_piv_lhs, d_piv_rhs):
 @njit
 def _IS_tri_fixed_first_pivot(d_piv_lhs, d_piv_rhs):
     n_pivs, n_pairs = d_piv_lhs.shape
-    lb_quality = np.zeros([1, n_pivs])
+    lb_quality = np.zeros(n_pivs)
 
     p0 = _best_starting_pivot(d_piv_lhs, d_piv_rhs)
     for p1 in range(n_pivs):
         for pair in range(n_pairs):
             a = np.abs(d_piv_lhs[p0, pair] - d_piv_rhs[p0, pair])
             b = np.abs(d_piv_lhs[p1, pair] - d_piv_rhs[p1, pair])
-            lb_quality[p0, p1] += max(a, b)
+            lb_quality[p1] += max(a, b)
 
-    _, p1 = _argamax(lb_quality)
+    p1 = np.argmax(lb_quality)
     return p0, p1
 
 
@@ -130,9 +150,8 @@ def _best_starting_pivot(d_piv_lhs, d_piv_rhs):
     n_pivs, n_pairs = d_piv_lhs.shape
     lb_quality = np.zeros(n_pivs)
 
-    for piv0 in range(0, n_pivs):
-        for pair in range(n_pairs):
-            lb_quality[piv0] = np.abs(d_piv_lhs[piv0, :] - d_piv_rhs[piv0, :]).sum()
+    for piv0 in range(n_pivs):
+        lb_quality[piv0] = np.abs(d_piv_lhs[piv0, :] - d_piv_rhs[piv0, :]).sum()
 
     p0 = np.argmax(lb_quality)
     return p0
@@ -161,16 +180,16 @@ def _IS_pto(d_piv_lhs, d_piv_rhs, d_piv_piv):
 def _IS_pto_fixed_first_pivot(d_piv_lhs, d_piv_rhs, d_piv_piv):
     """Calculate the sum of Ptolemy's lower bounds"""
     n_pivs, n_pairs = d_piv_lhs.shape
-    lb_quality = np.zeros((1, n_pivs))
+    lb_quality = np.zeros(n_pivs)
 
     p0 = _best_starting_pivot(d_piv_lhs, d_piv_rhs)
     for p1 in range(n_pivs):
-        lb_quality[p0, p1] = (
+        lb_quality[p1] = (
             np.abs(
                 d_piv_lhs[p0, :] * d_piv_rhs[p1, :]
                 - d_piv_lhs[p1, :] * d_piv_rhs[p0, :]
             )
         ).sum() / d_piv_piv[p0, p1]
 
-    _, p1 = _argamax(lb_quality)
+    p1 = np.argmax(lb_quality)
     return p0, p1

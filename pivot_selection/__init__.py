@@ -41,7 +41,7 @@ def __add_lbsums(algs):
             pair_exp=3 / 4,
         ),
         dict(
-            name="Pto_tri_1.5",
+            name="IS_pto_1.5",
             lb_type="pto",
             fixed_first_pivot=False,
             piv_exp=3 / 4,
@@ -76,6 +76,8 @@ def __add_lbsums(algs):
                 lb_type=p["lb_type"],
                 fixed_first_pivot=p["fixed_first_pivot"],
             )
+
+        return f
 
     for p in params:
         algs[p["name"]] = gen_f(p)
