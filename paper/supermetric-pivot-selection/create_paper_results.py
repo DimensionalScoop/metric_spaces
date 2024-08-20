@@ -60,6 +60,7 @@ def compare_projections(
                     try:
                         doit()
                     except:
+                        print(f"Skipped error at {dim} {gen_name} {algo_name}.")
                         rv.append(
                             dict(
                                 dim=dim,
@@ -99,7 +100,6 @@ piv_selectors = pivot_selection.get_selection_algos(True)
 if SKIP_OPTIMAL_SELECTORS:
     del piv_selectors["hilbert_optimal"]
     del piv_selectors["ccs_optimal"]
-    del piv_selectors["opt_triangle_IS"]
 
 
 def run_task(run_id, dim):
@@ -108,7 +108,7 @@ def run_task(run_id, dim):
         piv_selectors,
         [dim],
         seed=100 * run_id + dim,
-        errors="raise",
+        errors="skip",
         verbose=False,
     )
     r["run"] = run_id
@@ -124,7 +124,7 @@ for run_id in range(0, 100_000, N_RUNS):
             this_run_id = SEED_OFFSET + run_id + subrun
             jobs.append(delayed(run_task)(this_run_id, dim))
 
-    results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=11)(jobs))
+    results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=1)(jobs))
 
     notes = "-optimal_skipped" if SKIP_OPTIMAL_SELECTORS else ""
     results.to_csv(

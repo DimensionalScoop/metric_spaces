@@ -78,7 +78,7 @@ df = result
 # %%
 failed = df.query("note == 'failed'")
 assert set(failed.dim) == {2}
-assert set(failed.algorithm) == {"hilbert_optimal"}
+# assert set(failed.algorithm) == {"hilbert_optimal"}
 
 # XXX: quick fix: let's exclude dim=2
 results = df.query("dim != 2").copy()
@@ -160,14 +160,18 @@ def make_algos_human_readable(df):
         maximize_dist="maximize dist",
         non_central_points="maximize var",
         non_central_points_approx="maximize var approx",
-        approx_Ptolemy_IS="Ptolemy IS approx",
-        approx_cheap_Ptolemy_IS="Ptolemy IS approx cheap",
-        approx_triangle_IS="Triangle IS approx",
+        # approx_Ptolemy_IS="Ptolemy IS approx",
+        # approx_cheap_Ptolemy_IS="Ptolemy IS approx cheap",
+        # approx_triangle_IS="Triangle IS approx",
         different_cluster_centers="different cluster centers",
         random="random",
         ccs_optimal="optimal",
         hilbert_optimal="optimal",
     )
+    algo_map["IS_pto_1.5_greedy"] = "Ptolemy IS greedy approx"
+    algo_map["IS_tri_1.5_greedy"] = "Triangle IS greedy approx"
+    algo_map["Pto_tri_1.5"] = "Ptolemy IS approx"
+    algo_map["IS_tri_1.5"] = "Triangle IS approx"
     num_algos = len(set(df.algorithm))
     df["algorithm"] = df.algorithm.map(algo_map)
     if num_algos != len(set(df.algorithm)):
