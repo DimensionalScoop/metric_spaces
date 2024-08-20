@@ -26,14 +26,14 @@ def IS(
     lb_type: Triangle or Ptolemaic lower bound?
     fixed_fist_pivot: fix one pivot for speedup?
 
-    if lb_type == "tri": dist_calcs = O(n_pivs * n_objects)
-    if lb_type == "pto": dist-calcs = O(n_pivs * n_objects + n_pivs**2)
+    if lb_type == "tri": dist_calcs = O(n_pivs * n_pairs)
+    if lb_type == "pto": dist-calcs = O(n_pivs * n_pairs + (fixed_fist_pivot) * n_pivs**2)
 
     match (lb_type, fixed_first_pivot):
     if fixed_first_pivot:
-        complexity: O(n_pivs * n_objects**2)
+        complexity: O(n_pivs * n_pairs)
     else:
-        complexity: O(n_pivs**2 * n_objects**2)
+        complexity: O(n_pivs**2 * n_pairs)
 
     Review paper: zhuPivotSelectionAlgorithms2022
     """
@@ -61,9 +61,8 @@ def IS(
 
     get_best_pair = choose_algo()
     p0, p1 = get_best_pair(**cached_distances)
+    assert p0 != p1
 
-    if fixed_first_pivot:
-        assert p0 == 0
     return piv_cand[p0], piv_cand[p1]
 
 
@@ -78,6 +77,13 @@ def _choose_pivs_and_pairs(rng, ps, n_pivs, n_pairs):
     lhs = ps[valid_permutations[pairs_idx, 0]]
     rhs = ps[valid_permutations[pairs_idx, 1]]
     return piv_candidates, lhs, rhs
+
+
+@njit
+def _argamax(a):
+    """Return index of largest scalar in array.
+    Like np.argmax, but for amax (the maximum along all axis)"""
+    return np.unravel_index(np.argmax(a.flatten()), a.shape)
 
 
 @njit
@@ -98,7 +104,7 @@ def _IS_tri(d_piv_lhs, d_piv_rhs):
                 b = np.abs(d_piv_lhs[piv1, pair] - d_piv_rhs[piv1, pair])
                 lb_quality[piv0, piv1] += max(a, b)
 
-    p0, p1 = np.amax(lb_quality)
+    p0, p1 = _argamax(lb_quality)
     return p0, p1
 
 
@@ -107,15 +113,29 @@ def _IS_tri_fixed_first_pivot(d_piv_lhs, d_piv_rhs):
     n_pivs, n_pairs = d_piv_lhs.shape
     lb_quality = np.zeros([1, n_pivs])
 
-    piv0 = 0
-    for piv1 in range(piv0 + 1, n_pivs):
+    p0 = _best_starting_pivot(d_piv_lhs, d_piv_rhs)
+    for p1 in range(n_pivs):
         for pair in range(n_pairs):
-            a = np.abs(d_piv_lhs[piv0, pair] - d_piv_rhs[piv0, pair])
-            b = np.abs(d_piv_lhs[piv1, pair] - d_piv_rhs[piv1, pair])
-            lb_quality[piv0, piv1] += max(a, b)
+            a = np.abs(d_piv_lhs[p0, pair] - d_piv_rhs[p0, pair])
+            b = np.abs(d_piv_lhs[p1, pair] - d_piv_rhs[p1, pair])
+            lb_quality[p0, p1] += max(a, b)
 
-    p0, p1 = np.amax(lb_quality)
+    _, p1 = _argamax(lb_quality)
     return p0, p1
+
+
+@njit
+def _best_starting_pivot(d_piv_lhs, d_piv_rhs):
+    """Find the single pivot maximizing the triangle lower bound."""
+    n_pivs, n_pairs = d_piv_lhs.shape
+    lb_quality = np.zeros(n_pivs)
+
+    for piv0 in range(0, n_pivs):
+        for pair in range(n_pairs):
+            lb_quality[piv0] = np.abs(d_piv_lhs[piv0, :] - d_piv_rhs[piv0, :]).sum()
+
+    p0 = np.argmax(lb_quality)
+    return p0
 
 
 @njit
@@ -133,7 +153,7 @@ def _IS_pto(d_piv_lhs, d_piv_rhs, d_piv_piv):
                 )
             ).sum() / d_piv_piv[p0, p1]
 
-    p0, p1 = np.amax(lb_quality)
+    p0, p1 = _argamax(lb_quality)
     return p0, p1
 
 
@@ -143,8 +163,8 @@ def _IS_pto_fixed_first_pivot(d_piv_lhs, d_piv_rhs, d_piv_piv):
     n_pivs, n_pairs = d_piv_lhs.shape
     lb_quality = np.zeros((1, n_pivs))
 
-    p0 = 0
-    for p1 in range(p0 + 1, n_pivs):
+    p0 = _best_starting_pivot(d_piv_lhs, d_piv_rhs)
+    for p1 in range(n_pivs):
         lb_quality[p0, p1] = (
             np.abs(
                 d_piv_lhs[p0, :] * d_piv_rhs[p1, :]
@@ -152,5 +172,5 @@ def _IS_pto_fixed_first_pivot(d_piv_lhs, d_piv_rhs, d_piv_piv):
             )
         ).sum() / d_piv_piv[p0, p1]
 
-    p0, p1 = np.amax(lb_quality)
+    _, p1 = _argamax(lb_quality)
     return p0, p1
