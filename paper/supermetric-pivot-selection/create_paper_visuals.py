@@ -180,6 +180,8 @@ def make_algos_human_readable(df):
 
 
 ex = make_algos_human_readable(normalized_res.copy())
+# print(list(set(ex.algorithm)))
+# XXX: why are there nan algos?
 ex = ex.query("dataset == 'univariate, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
 
@@ -312,6 +314,53 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 
 
 # %%
+def plot_hilbert_IS_only():
+    y = "hilbert_quality"
+    y_label = "relative useful partition size"
+
+    df = normalized_res[
+        normalized_res.algorithm.isin(
+            [
+                "IS_tri_1.5_greedy",
+                "IS_pto_1.5_greedy",
+                "Pto_tri_1.5",
+                "IS_tri_1.5",
+                "hilbert_optimal",
+            ]
+        )
+    ]
+
+    df = df.rename(columns={y: y_label})
+    df = make_algos_human_readable(df)
+
+    g = sns.FacetGrid(
+        data=df,
+        col="dataset",
+        hue="algorithm",
+        col_wrap=2,
+        sharey=False,
+    )
+
+    def plot_borders(**kwargs):
+        data = kwargs.pop("data")
+        ax = plt.gca()
+        plt.grid(visible=True)
+        # ax.fill_between(data["dim"], 1, ax.get_ylim()[1], alpha=0.1, color="C0")
+        # ax.fill_between(data["dim"], 1, ax.get_ylim()[0], alpha=0.1, color="C0")
+
+    g.map(sns.lineplot, "dim", y_label)
+    g.map_dataframe(plot_borders)
+
+    # g.set(ylim=(-0.05, 1.1))
+    g.add_legend()
+    g.savefig(OUT_PATH + "IS_only_hilbert.pdf")
+    plt.clf()
+
+
+plot_hilbert_IS_only()
+
+
+# %%
 def plot_hilbert():
     y = "hilbert_quality"
     y_label = "relative useful partition size"
@@ -325,7 +374,6 @@ def plot_hilbert():
             ]
         )
     ]
-    print(set(df.algorithm))
 
     df = df.rename(columns={y: y_label})
     df = make_algos_human_readable(df)
