@@ -14,6 +14,9 @@
 # ---
 
 # %%
+# %load_ext autoreload
+# %autoreload 3
+
 import numpy as np
 import pandas as pd
 from joblib import delayed, Parallel
@@ -37,15 +40,20 @@ import seaborn as sns
 # %%
 dims = 10
 n_points = 1000
-n_pivs = 20
-budget = 2*n_points
+n_piv_candidates = 300
+n_pivs_required = 10
+budget = 4*n_points
 metric = pivot_selection.lb_summation.METRIC
 
 rng = np.random.default_rng(0xABACADABA)
 
 data = point_generator.generate_univar_points(rng, n_points, dim=dims)
-tri_pivots = pivot_selection.lb_summation.IS(data, n_pivs, budget, rng, "tri")
-pto_pivots = pivot_selection.lb_summation.IS(data, n_pivs, budget, rng, "pto")
+tri_pivots = pivot_selection.lb_summation.IS_multiple(data, n_piv_candidates, budget, rng, "tri",n_pivs_required)
+trai_pivots = rng.choice(data, size=n_pivs)
+pto_pivots = pivot_selection.lb_summation.IS(data, n_piv_candidates, budget, rng, "pto")
+
+# %%
+tri_pivots
 
 # %%
 triu = np.triu_indices(n_points,1)
@@ -100,9 +108,19 @@ def get_best_pto_lbs(pivots, data):
 best_tri_pto_lbs = get_best_pto_lbs(tri_pivots, data)
 best_pto_pto_lbs = get_best_pto_lbs(pto_pivots, data)
 
+
 # %%
 #distances_from_pivot
 # cached distances
+
+def histogram_overlap(data_a, data_b, bins=50):
+    both = np.hstack((data_a, data_b))
+    bins = np.histogram_bin_edges(both, bins=bins)
+    a, _ = np.histogram(data_a, bins)
+    b, _ = np.histogram(data_b, bins)
+    overlap_absolute = np.vstack((a, b)).min(axis=0).sum()
+    bin_width = bins[1] - bins[0]
+    return overlap_absolute / len(data_a)
 
 _, bins, _ = plt.hist(actual_dists, bins=100, label="exact distances")
 plt.hist(best_tri_tri_lbs, histtype="step", bins=bins, label="tri IS, tri access");
@@ -111,5 +129,16 @@ plt.hist(best_tri_pto_lbs, histtype="step", bins=bins, label="tri IS, pto access
 plt.hist(best_pto_pto_lbs, histtype="step", bins=bins, label="pto IS, pto access");
 
 plt.legend()
+
+# %%
+histogram_overlap(actual_dists, best_tri_tri_lbs)
+
+# %%
+histogram_overlap(actual_dists, best_pto_tri_lbs)
+
+# %%
+histogram_overlap(actual_dists, best_pto_pto_lbs)
+
+# %%
 
 # %%

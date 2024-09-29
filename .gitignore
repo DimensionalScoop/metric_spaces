@@ -171,3 +171,4 @@ paper/supermetric-pivot-selection/create_paper_visuals.ipynb
 paper/supermetric-pivot-selection/test_single.ipynb
 results
 paper/supermetric-pivot-selection/vis_datasets.ipynb
+paper/IS-comparison/indexability_by_pivot_choice.ipynb

@@ -193,3 +193,81 @@ def _IS_pto_fixed_first_pivot(d_piv_lhs, d_piv_rhs, d_piv_piv):
 
     p1 = np.argmax(lb_quality)
     return p0, p1
+
+
+def IS_multiple(
+    ps,
+    n_pivs_candidates,
+    n_pairs,
+    rng: np.random.Generator,
+    lb_type: Literal["tri", "pto"] = "tri",
+    n_pivs_required=2,
+):
+    """Greedily maximize the sum of distances of the lower-bound approximation, using `n_pivs_required` pivots.
+    Returns the best pivots.
+
+    Review paper: zhuPivotSelectionAlgorithms2022
+    """
+    piv_cand, lhs, rhs = _choose_pivs_and_pairs(rng, ps, n_pivs_candidates, n_pairs)
+
+    cached_distances = dict(
+        d_piv_lhs=METRIC.distance_matrix(piv_cand, lhs),
+        d_piv_rhs=METRIC.distance_matrix(piv_cand, rhs),
+        n_pivots=n_pivs_required,
+    )
+    if lb_type == "pto":
+        cached_distances["d_piv_piv"] = METRIC.distance_matrix(piv_cand, piv_cand)
+
+    def choose_algo():
+        match lb_type:
+            case "tri":
+                return _IS_tri_greedy_multiple_pivot
+            # case "pto":
+            #     return _IS_pto
+            case _:
+                raise ValueError(f"Unknown combination {lb_type}, {fixed_first_pivot}")
+
+    get_best_pivs = choose_algo()
+    pivs_idx = get_best_pivs(**cached_distances)
+
+    print(pivs_idx)
+    print(piv_cand.shape)
+
+    return piv_cand[pivs_idx, :]
+
+
+@njit
+def _IS_tri_greedy_multiple_pivot(d_piv_lhs, d_piv_rhs, n_pivots):
+    """Greedily find the `n_pivots` best triangle pivots
+    (instead of finding the best pair)
+    """
+    n_pivs, n_pairs = d_piv_lhs.shape
+    lb_all_dists = np.zeros((n_pivs, n_pairs))
+
+    piv_candidates = set(range(n_pivs))
+    found_pivots = []
+
+    for p in range(n_pivs):
+        lb_all_dists[p, :] = np.abs(d_piv_lhs[p, :] - d_piv_rhs[p, :])
+    p0 = np.argmax(lb_all_dists.sum(axis=1))
+
+    found_pivots.append(p0)
+    piv_candidates.remove(p0)
+    current_best_lbs = lb_all_dists[p0]
+
+    while len(found_pivots) < n_pivots:
+        best_candidate = -1
+        best_quality = -1
+        for p in piv_candidates:
+            this_lbs = lb_all_dists[p, :]
+            this_quality = np.fmax(current_best_lbs, this_lbs).sum()
+            if this_quality > best_quality:
+                best_quality = this_quality
+                best_candidate = p
+
+        found_pivots.append(best_candidate)
+        piv_candidates.remove(best_candidate)
+        best_lbs = lb_all_dists[best_candidate, :]
+        current_best_lbs = np.fmax(current_best_lbs, best_lbs)
+
+    return found_pivots
