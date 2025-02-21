@@ -1,22 +1,3 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:percent
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.16.4
-#   kernelspec:
-#     display_name: Python 3 (ipykernel)
-#     language: python
-#     name: python3
-# ---
-
-# %%
-# %load_ext autoreload
-# %autoreload 2
-
 import sys
 from glob import glob
 from warnings import warn
@@ -33,7 +14,7 @@ sys.path.append("../..")
 # load the files with the expensive optimal results
 BASE = "/home/elayn/Projects/hagen/1_forschung/epix/metric_spaces/"
 PATH = BASE + "paper/supermetric-pivot-selection/results/"
-OUT_PATH = BASE + "paper/supermetric-pivot-selection/fig/"
+OUT_PATH = BASE + "output/"
 files = glob(PATH + "slow-only/*.csv")
 # files += [PATH + "deduplicated-run-1.csv"]
 df = pd.concat(pd.read_csv(f) for f in files)
@@ -481,7 +462,7 @@ OUT_PATH
 # plt.clf()
 
 # %%
-raise Execption("Unsused code")
+raise Exception("Unsused code")
 
 
 # %%

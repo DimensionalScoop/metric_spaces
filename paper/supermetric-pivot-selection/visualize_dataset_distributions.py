@@ -1,47 +1,23 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:percent
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.16.4
-#   kernelspec:
-#     display_name: Python 3 (ipykernel)
-#     language: python
-#     name: python3
-# ---
-
-# %%
-
-# %load_ext autoreload
-# %autoreload 2
-
-import sys
+"""Examplatory 2D visualizations of the dataset generators"""
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
-sys.path.append("../..")
-
+from matplotlib import rcParams
 
 from generate import point_generator
 
-# %%
 N_SAMPLES = 512
-# paper/supermetric-pivot-selection/
-OUT_PATH = "fig/"
+OUT_PATH = "output/"
 
 rng = np.random.default_rng(0xFEED2)
 gens = point_generator.get_generator_dict(N_SAMPLES)
-df = []
+distributions = []
 for name, func in gens.items():
     points = func(rng=rng, dim=2)
 
-    df.append(
+    distributions.append(
         dict(
             dataset=name,
             x=points[:, 0],
@@ -49,11 +25,8 @@ for name, func in gens.items():
         )
     )
 
-df = pd.DataFrame(df).explode(["x", "y"])
+distributions = pd.DataFrame(distributions).explode(["x", "y"])
 
-# %%
-# TODO: refactor to give the IEEE style it's own file
-from matplotlib import rcParams
 
 # These lines are needed to get type-1 results:
 # http://nerdjusttyped.blogspot.com/2011/07/type#-1-fonts-and-matplotlib-figures.html
@@ -63,18 +36,10 @@ rcParams["text.usetex"] = False
 
 plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 
-# %%
-
-# %%
-set(df.dataset)
-
-# %%
-df.dataset.replace(
+distributions = distributions.dataset.replace(
     {"univariate, idd": "uniform, idd", "univariate, stretched": "uniform, stretched"},
-    inplace=True,
 )
 
-# %%
 col_order = [
     "clusters, overlapping",
     "gaussian, circular",
@@ -86,7 +51,7 @@ col_order = [
 
 
 g = sns.FacetGrid(
-    data=df,
+    data=distributions,
     col="dataset",
     col_order=col_order,
     col_wrap=3,
@@ -97,7 +62,6 @@ g = sns.FacetGrid(
 )
 
 g.map(sns.scatterplot, "x", "y", marker="+")
-# g.set(ylim=(-0.05, 1.1))
 
 for ax in g.axes.flat:
     ax.set_aspect("equal", adjustable="box")
@@ -107,5 +71,3 @@ g.set_axis_labels(x_var="", y_var="")
 g.add_legend()
 g.tight_layout()
 g.savefig(OUT_PATH + "datasets.pdf")
-
-# %%
