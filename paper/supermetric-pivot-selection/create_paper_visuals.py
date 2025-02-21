@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.2
+#       jupytext_version: 1.16.4
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -39,10 +39,11 @@ from generate import point_generator
 
 # %%
 # load the files with the expensive optimal results
-PATH = "paper/supermetric-pivot-selection/results/"
-OUT_PATH = "paper/supermetric-pivot-selection/fig/"
-files = glob(PATH + "run-2/*.csv")
-files += [PATH + "deduplicated-run-1.csv"]
+BASE = "/home/elayn/Projects/hagen/1_forschung/epix/metric_spaces/"
+PATH = BASE+"paper/supermetric-pivot-selection/results/"
+OUT_PATH = BASE+"paper/supermetric-pivot-selection/fig/"
+files = glob(PATH + "slow-only/*.csv")
+#files += [PATH + "deduplicated-run-1.csv"]
 df = pd.concat((pd.read_csv(f) for f in files))
 df = df.drop(columns=["Unnamed: 0"])
 df = df.drop_duplicates()
@@ -53,6 +54,11 @@ len(set(df.run))
 # load additional files with cheaper results
 files = glob(PATH + "fast-only/*.csv")
 add_df = pd.concat((pd.read_csv(f) for f in files)).drop(columns=["Unnamed: 0"])
+add_df = add_df.drop_duplicates()
+len(set(add_df.run))
+
+# %%
+set(add_df.algorithm)
 
 # %%
 left = df
@@ -103,10 +109,19 @@ u = results.groupby(
         "algorithm",
     ]
 ).apply(len, include_groups=False)
-assert (
-    len(set(u)) == 1
-), f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
-print(f"samples per (`dataset` x `dim` x `algorithm`) combination: {set(u)}")
+#assert (
+#    len(set(u)) == 1
+#), f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
+#print(f"samples per (`dataset` x `dim` x `algorithm`) combination: {set(u)}")
+
+# %%
+results.groupby(["dataset", "dim"])["seed"].apply(lambda x:len(x.unique()))
+
+# %%
+results
+
+# %%
+results.dataset = results.dataset.replace({"univariate, idd": "uniform, idd","univariate, stretched": "uniform, stretched"})
 
 
 # %%
@@ -147,31 +162,28 @@ normalized_res = normalized_res.reset_index(level=grp)
 normalized_res
 
 # assert all(normalized_res.query("algorithm != 'hilbert_optimal'").hilbert_quality <= 2)
-ex = normalized_res.query("dataset == 'univariate, stretched'")
+ex = normalized_res.query("dataset == 'uniform, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
-
-# %%
-set(result.algorithm)
 
 
 # %%
 def make_algos_human_readable(df):
     algo_map = dict(
-        maximize_dist="maximize dist",
-        non_central_points="maximize var",
-        non_central_points_approx="maximize var approx",
+        maximize_dist="max distance",
+        # non_central_points="maximize var",
+        non_central_points_approx="max variance",
         # approx_Ptolemy_IS="Ptolemy IS approx",
         # approx_cheap_Ptolemy_IS="Ptolemy IS approx cheap",
         # approx_triangle_IS="Triangle IS approx",
-        different_cluster_centers="different cluster centers",
+        #different_cluster_centers="different cluster centers",
         random="random",
         ccs_optimal="optimal",
         hilbert_optimal="optimal",
     )
-    algo_map["IS_pto_1.5_greedy"] = "Ptolemy IS greedy approx"
-    algo_map["IS_tri_1.5_greedy"] = "Triangle IS greedy approx"
-    algo_map["Pto_tri_1.5"] = "Ptolemy IS approx"
-    algo_map["IS_tri_1.5"] = "Triangle IS approx"
+    #algo_map["IS_pto_1.5_greedy"] = "Ptolemy IS greedy approx"
+    #algo_map["IS_tri_1.5_greedy"] = "Triangle IS greedy approx"
+    algo_map["IS_pto_1.5"] = "max Ptolemy LB"
+    algo_map["IS_tri_1.5"] = "max triangle LB"
     num_algos = len(set(df.algorithm))
     df["algorithm"] = df.algorithm.map(algo_map)
     if num_algos != len(set(df.algorithm)):
@@ -182,7 +194,7 @@ def make_algos_human_readable(df):
 ex = make_algos_human_readable(normalized_res.copy())
 # print(list(set(ex.algorithm)))
 # XXX: why are there nan algos?
-ex = ex.query("dataset == 'univariate, stretched'")
+ex = ex.query("dataset == 'uniform, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
 
 # %%
@@ -227,11 +239,11 @@ def tabulate(value="hilbert", pivot_table=True):
             values="mean", columns="algorithm", index="dataset"
         )
 
-        return result  # .to_latex(escape=False)
     else:
         result = result.reset_index().sort_values(["dataset", "mean"], ascending=False)
         result = result.set_index(["dataset", "algorithm"])
-        return result
+
+    return result.reindex(columns=['max Ptolemy LB', 'max triangle LB', 'max variance', 'max distance', 'random'])
 
 
 tabulate()
@@ -312,6 +324,9 @@ rcParams["text.usetex"] = False
 
 plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 
+# %%
+set(normalized_res.algorithm)
+
 
 # %%
 def plot_hilbert_IS_only():
@@ -323,7 +338,7 @@ def plot_hilbert_IS_only():
             [
                 "IS_tri_1.5_greedy",
                 "IS_pto_1.5_greedy",
-                "Pto_tri_1.5",
+                "IS_pto_1.5",
                 "IS_tri_1.5",
                 "hilbert_optimal",
             ]
@@ -357,8 +372,7 @@ def plot_hilbert_IS_only():
     plt.clf()
 
 
-plot_hilbert_IS_only()
-
+#plot_hilbert_IS_only()
 
 # %%
 def plot_hilbert():
@@ -402,6 +416,8 @@ def plot_hilbert():
 
     return g
 
+plot_hilbert()
+
 
 # %%
 def plot_css():
@@ -440,20 +456,24 @@ def plot_css():
     g.map_dataframe(plot_borders)
 
     # g.set(ylim=(-0.05, 1.1))
-    # g.add_legend()
+    g.add_legend()
     g.savefig(OUT_PATH + "css.pdf")
     return g
 
+plot_css()
 
 # %%
-import patchworklib as pw
+OUT_PATH
 
-plt.clf()
-pw.overwrite_axisgrid()
-g0 = pw.load_seaborngrid(plot_hilbert(), label="g0")
-g1 = pw.load_seaborngrid(plot_css(), label="g1")
-(g1 | g0).savefig(OUT_PATH + "results.pdf")
-plt.clf()
+# %%
+#import patchworklib as pw
+
+#plt.clf()
+#pw.overwrite_axisgrid()
+#g0 = pw.load_seaborngrid(plot_hilbert(), label="g0")
+#g1 = pw.load_seaborngrid(plot_css(), label="g1")
+#(g1 | g0).savefig(OUT_PATH + "results.pdf")
+#plt.clf()
 
 # %%
 raise Execption("Unsused code")

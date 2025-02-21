@@ -127,11 +127,11 @@ def run(seed, metric, n_samples=20):
 
 
 metrics = [
-    Euclid(),
+    # Euclid(),
     EuclidNumba(),
-    PNormNumba(),
-    PNormNumbaSlow(),
-    PNormNumbaGreat(),
+    # PNormNumba(),
+    # PNormNumbaSlow(),
+    # PNormNumbaGreat(),
 ]
 results = []
 

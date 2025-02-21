@@ -87,7 +87,7 @@ metric = Euclid(2)
 N_RUNS = 8
 N_SAMPLES = 512
 DIMS = range(2, 18)
-N_CPUS = 20  # 64
+N_CPUS = 10  # 64
 SEED_OFFSET = 3710_000
 # if you calculated the optimal stuff beforehand, set this to true for massive speedups
 SKIP_OPTIMAL_SELECTORS = True
@@ -115,7 +115,7 @@ def run_task(run_id, dim):
     return r
 
 
-for run_id in range(0, 100_000, N_RUNS):
+for run_id in range(0, 2000, N_RUNS):
     print(f"============ run {run_id} to {run_id+N_RUNS} ==============")
 
     jobs = []

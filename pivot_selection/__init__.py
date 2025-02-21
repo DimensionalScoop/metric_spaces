@@ -10,6 +10,7 @@ def get_selection_algos(only_useful=False) -> dict[str, callable]:
     algs = dict(
         random=heuristics.random_pivots,
         maximize_dist=heuristics.max_dist_points,
+        gnat_dist=fast.max_dist_GNAT,
         minimize_dist=heuristics.min_dist_points,
         central_points=heuristics.two_most_central,
         non_central_points=heuristics.two_least_central,
