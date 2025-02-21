@@ -55,9 +55,9 @@ def two_least_central_heuristically(ps, rng: np.random.Generator, budget=np.sqrt
     dists[~keep] = -1
 
     actual_evaluations = dists.size - (dists == -1).sum()
-    assert np.allclose(
-        actual_evaluations, dist_budget, atol=2
-    ), f"`dists` has {actual_evaluations:e} entries, but it should have no more than {dist_budget:e}!"
+    assert np.allclose(actual_evaluations, dist_budget, atol=2), (
+        f"`dists` has {actual_evaluations:e} entries, but it should have no more than {dist_budget:e}!"
+    )
 
     # make matrix symmetric again
     dists = np.maximum(dists, dists.T)

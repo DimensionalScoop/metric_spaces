@@ -92,8 +92,8 @@ class HilbertPartitioner:
         right = np.argwhere(projection > mid + r).flatten()
 
         intersec = set(left).intersection(right)
-        assert (
-            len(intersec) == 0
-        ), f"a point can only be on one side, but these are on both: {intersec}"
+        assert len(intersec) == 0, (
+            f"a point can only be on one side, but these are on both: {intersec}"
+        )
 
         return left, right

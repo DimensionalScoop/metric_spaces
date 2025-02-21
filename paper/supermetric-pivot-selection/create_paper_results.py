@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from joblib import delayed, Parallel
 from tqdm import tqdm
-import time
 
 from tetrahedron import tetrahedron, proj_quality
 from metric.metric import Euclid
@@ -116,7 +115,7 @@ def run_task(run_id, dim):
 
 
 for run_id in range(0, 2000, N_RUNS):
-    print(f"============ run {run_id} to {run_id+N_RUNS} ==============")
+    print(f"============ run {run_id} to {run_id + N_RUNS} ==============")
 
     jobs = []
     for subrun in range(N_RUNS):
@@ -128,5 +127,5 @@ for run_id in range(0, 2000, N_RUNS):
 
     notes = "-optimal_skipped" if SKIP_OPTIMAL_SELECTORS else ""
     results.to_csv(
-        f"{PATH}fast-only/results_{run_id}-to-{run_id+N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
+        f"{PATH}fast-only/results_{run_id}-to-{run_id + N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
     )

@@ -29,7 +29,9 @@ def plot_hull(points, ax=None, color="gray", **kwargs):
     line_segments = hull_points.reshape(1, -1, 2)
 
     ax = ax or plt.gca()
-    ax.add_collection(LineCollection(line_segments, colors=color, facecolors=color, **kwargs))
+    ax.add_collection(
+        LineCollection(line_segments, colors=color, facecolors=color, **kwargs)
+    )
     ax.autoscale()
 
 
@@ -49,14 +51,18 @@ def _rescale_one_axis(old_lims, points_to_include):
 
 
 def _scale_limits(ax, include_points):
-    ax.set_xlim(_rescale_one_axis(
-        ax.get_xlim(),
-        include_points[:, 0],
-    ))
-    ax.set_ylim(_rescale_one_axis(
-        ax.get_ylim(),
-        include_points[:, 1],
-    ))
+    ax.set_xlim(
+        _rescale_one_axis(
+            ax.get_xlim(),
+            include_points[:, 0],
+        )
+    )
+    ax.set_ylim(
+        _rescale_one_axis(
+            ax.get_ylim(),
+            include_points[:, 1],
+        )
+    )
 
 
 def points_to_pivot_space(points, pivots, dist_func):
@@ -79,7 +85,11 @@ def mask_forbidden(pivots, dist_func, ax=None):
         ax = plt.gca()
 
     def mask(*args, **kwargs):
-        return ax.fill_between(*args, **kwargs, color="xkcd:light grey", )
+        return ax.fill_between(
+            *args,
+            **kwargs,
+            color="xkcd:light grey",
+        )
 
     p_1, p_2 = points_to_pivot_space(pivots, pivots, dist_func)
     b = p_2[0]
@@ -136,7 +146,7 @@ class PivotSpaceVisualizer:
 
         ax.plot(*self.piv.pivots.T, "o", color="C2", label="pivots")
         ax.legend()
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
 
     @contextmanager
     def _plot_pivot_space(self, fig):
@@ -150,7 +160,7 @@ class PivotSpaceVisualizer:
         mask_forbidden(self.piv.pivots, self.piv.metric)
         pivots_t = self.piv.transform_points(self.piv.pivots)
         ax.plot(*pivots_t, "o", color="C2", label="pivots")
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
 
         if self.scale_to_include_pivots:
             _scale_limits(ax, pivots_t * 0.8)

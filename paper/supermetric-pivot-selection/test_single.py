@@ -41,7 +41,7 @@ DIM = 8
 SEED = 0xFEED
 
 GENERATOR = "gaussian, eliptic"
-#GENERATOR = "clusters, overlapping"
+# GENERATOR = "clusters, overlapping"
 
 generators = point_generator.get_generator_dict(N_SAMPLES)
 piv_selectors = pivot_selection.get_selection_algos(True)
@@ -54,7 +54,7 @@ r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
 # %%
 rv = []
 
-#del piv_selectors["Ptolemy_IS"]
+# del piv_selectors["Ptolemy_IS"]
 
 for algo_name, select_pivots in tqdm(piv_selectors.items()):
     print(algo_name)
@@ -68,7 +68,7 @@ for algo_name, select_pivots in tqdm(piv_selectors.items()):
                 points_p, r, metric
             ),
             hilbert_quality=proj_quality.hilbert_quality(points_p, r),
-            pivots = np.vstack((p0,p1))
+            pivots=np.vstack((p0, p1)),
         )
     )
 

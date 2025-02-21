@@ -39,9 +39,9 @@ def load_cifar_100_train():
 def color_histogram_1D(images, n_bins=256):
     """Generate three histogram per image, one for each primary color."""
     assert np.issubdtype(images.dtype, np.integer), "Input images must be integers"
-    assert np.all(
-        (images >= 0) & (images <= 255)
-    ), "Pixel values must be between 0 and 255"
+    assert np.all((images >= 0) & (images <= 255)), (
+        "Pixel values must be between 0 and 255"
+    )
 
     n_images = images.shape[0]
     n_colors = images.shape[-1]
@@ -60,9 +60,9 @@ def color_histogram_1D(images, n_bins=256):
 def color_histogram_3D(images, n_bins=10):
     """Generate one histogram per image, treating each pixle as a 3D color vector."""
     assert np.issubdtype(images.dtype, np.integer), "Input images must be integers"
-    assert np.all(
-        (images >= 0) & (images <= 255)
-    ), "Pixel values must be between 0 and 255"
+    assert np.all((images >= 0) & (images <= 255)), (
+        "Pixel values must be between 0 and 255"
+    )
 
     n_images = images.shape[0]
     n_colors = images.shape[-1]

@@ -11,9 +11,11 @@ def hyper_unit_grid(dimensions, samples):
     points = np.array([d.flatten() for d in ggrid]).T
     return points
 
+
 def fill_hypercube(dimensions, samples):
     """fill a hypercube with random points"""
     return np.random.rand(int(samples), dimensions) - 0.5
+
 
 def _check_sample_size(edge_length_in_samples, dimensions):
     if edge_length_in_samples < 2:

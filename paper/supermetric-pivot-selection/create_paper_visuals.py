@@ -40,10 +40,10 @@ from generate import point_generator
 # %%
 # load the files with the expensive optimal results
 BASE = "/home/elayn/Projects/hagen/1_forschung/epix/metric_spaces/"
-PATH = BASE+"paper/supermetric-pivot-selection/results/"
-OUT_PATH = BASE+"paper/supermetric-pivot-selection/fig/"
+PATH = BASE + "paper/supermetric-pivot-selection/results/"
+OUT_PATH = BASE + "paper/supermetric-pivot-selection/fig/"
 files = glob(PATH + "slow-only/*.csv")
-#files += [PATH + "deduplicated-run-1.csv"]
+# files += [PATH + "deduplicated-run-1.csv"]
 df = pd.concat((pd.read_csv(f) for f in files))
 df = df.drop(columns=["Unnamed: 0"])
 df = df.drop_duplicates()
@@ -75,9 +75,9 @@ right_keep = keep.merge(right, on=index_cols, how="left")
 result = pd.concat((left_keep, right_keep))
 
 algorithms_per_sample = result.groupby(index_cols).apply(len)
-assert len(
-    set(algorithms_per_sample)
-), "There are a different number of algorithms per sample!"
+assert len(set(algorithms_per_sample)), (
+    "There are a different number of algorithms per sample!"
+)
 
 df = result
 
@@ -109,19 +109,21 @@ u = results.groupby(
         "algorithm",
     ]
 ).apply(len, include_groups=False)
-#assert (
+# assert (
 #    len(set(u)) == 1
-#), f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
-#print(f"samples per (`dataset` x `dim` x `algorithm`) combination: {set(u)}")
+# ), f"We expected to have the same number of events for each algorithm, but we got {set(u)}."
+# print(f"samples per (`dataset` x `dim` x `algorithm`) combination: {set(u)}")
 
 # %%
-results.groupby(["dataset", "dim"])["seed"].apply(lambda x:len(x.unique()))
+results.groupby(["dataset", "dim"])["seed"].apply(lambda x: len(x.unique()))
 
 # %%
 results
 
 # %%
-results.dataset = results.dataset.replace({"univariate, idd": "uniform, idd","univariate, stretched": "uniform, stretched"})
+results.dataset = results.dataset.replace(
+    {"univariate, idd": "uniform, idd", "univariate, stretched": "uniform, stretched"}
+)
 
 
 # %%
@@ -175,13 +177,13 @@ def make_algos_human_readable(df):
         # approx_Ptolemy_IS="Ptolemy IS approx",
         # approx_cheap_Ptolemy_IS="Ptolemy IS approx cheap",
         # approx_triangle_IS="Triangle IS approx",
-        #different_cluster_centers="different cluster centers",
+        # different_cluster_centers="different cluster centers",
         random="random",
         ccs_optimal="optimal",
         hilbert_optimal="optimal",
     )
-    #algo_map["IS_pto_1.5_greedy"] = "Ptolemy IS greedy approx"
-    #algo_map["IS_tri_1.5_greedy"] = "Triangle IS greedy approx"
+    # algo_map["IS_pto_1.5_greedy"] = "Ptolemy IS greedy approx"
+    # algo_map["IS_tri_1.5_greedy"] = "Triangle IS greedy approx"
     algo_map["IS_pto_1.5"] = "max Ptolemy LB"
     algo_map["IS_tri_1.5"] = "max triangle LB"
     num_algos = len(set(df.algorithm))
@@ -225,9 +227,9 @@ def tabulate(value="hilbert", pivot_table=True):
         .agg(["mean", error_of_mean])
     )
 
-    assert (
-        result["error_of_mean"] < 0.5
-    ).all(), "Errors to high, disable results rounding and include errors!"
+    assert (result["error_of_mean"] < 0.5).all(), (
+        "Errors to high, disable results rounding and include errors!"
+    )
     result = result.drop(columns="error_of_mean")
 
     result = result.drop(index="optimal", level=1)
@@ -243,7 +245,15 @@ def tabulate(value="hilbert", pivot_table=True):
         result = result.reset_index().sort_values(["dataset", "mean"], ascending=False)
         result = result.set_index(["dataset", "algorithm"])
 
-    return result.reindex(columns=['max Ptolemy LB', 'max triangle LB', 'max variance', 'max distance', 'random'])
+    return result.reindex(
+        columns=[
+            "max Ptolemy LB",
+            "max triangle LB",
+            "max variance",
+            "max distance",
+            "random",
+        ]
+    )
 
 
 tabulate()
@@ -372,7 +382,8 @@ def plot_hilbert_IS_only():
     plt.clf()
 
 
-#plot_hilbert_IS_only()
+# plot_hilbert_IS_only()
+
 
 # %%
 def plot_hilbert():
@@ -415,6 +426,7 @@ def plot_hilbert():
     g.savefig(OUT_PATH + "partition.pdf")
 
     return g
+
 
 plot_hilbert()
 
@@ -460,20 +472,21 @@ def plot_css():
     g.savefig(OUT_PATH + "css.pdf")
     return g
 
+
 plot_css()
 
 # %%
 OUT_PATH
 
 # %%
-#import patchworklib as pw
+# import patchworklib as pw
 
-#plt.clf()
-#pw.overwrite_axisgrid()
-#g0 = pw.load_seaborngrid(plot_hilbert(), label="g0")
-#g1 = pw.load_seaborngrid(plot_css(), label="g1")
-#(g1 | g0).savefig(OUT_PATH + "results.pdf")
-#plt.clf()
+# plt.clf()
+# pw.overwrite_axisgrid()
+# g0 = pw.load_seaborngrid(plot_hilbert(), label="g0")
+# g1 = pw.load_seaborngrid(plot_css(), label="g1")
+# (g1 | g0).savefig(OUT_PATH + "results.pdf")
+# plt.clf()
 
 # %%
 raise Execption("Unsused code")

@@ -95,6 +95,6 @@ def test_candidate_set(points_10d):
     candidate_set = __to_set(np.flatnonzero(lb_dists <= query_r))
 
     missing = solution_set.difference(candidate_set)
-    assert solution_set.issubset(
-        candidate_set
-    ), f"{missing} are missing from the candidate set!"
+    assert solution_set.issubset(candidate_set), (
+        f"{missing} are missing from the candidate set!"
+    )
