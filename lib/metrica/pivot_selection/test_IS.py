@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from ..generate import point_generator
+from generate import point_generator
 from . import heuristics_fast as fast
 
 

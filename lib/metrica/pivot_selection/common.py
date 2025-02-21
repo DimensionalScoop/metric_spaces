@@ -1,8 +1,4 @@
-import sys
-
-sys.path.append("../../")
-
-from metric.metric import Euclid
+from metrica.metric import Euclid
 
 METRIC = Euclid(2)
 
