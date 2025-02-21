@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.2
+#       jupytext_version: 1.16.4
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -75,14 +75,19 @@ plt.rcParams.update({"text.usetex": True, "font.family": "Helvetica"})
 set(df.dataset)
 
 # %%
+df.dataset.replace({"univariate, idd": "uniform, idd","univariate, stretched": "uniform, stretched"},inplace=True)
+
+# %%
 col_order = [
     'clusters, overlapping',
  'gaussian, circular',
- 'univariate, idd',
+ 'uniform, idd',
  'clusters, sparse',
  'gaussian, eliptic',
- 'univariate, stretched',
+ 'uniform, stretched',
 ]
+
+
 
 g = sns.FacetGrid(
     data=df,
