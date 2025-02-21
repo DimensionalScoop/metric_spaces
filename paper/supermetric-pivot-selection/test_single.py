@@ -14,25 +14,22 @@
 # ---
 
 # %%
+import sys
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from joblib import delayed, Parallel
 from tqdm.auto import tqdm
-import time
-import matplotlib.pyplot as plt
-
-import sys
 
 # %load_ext autoreload
 # %autoreload 3
 
 sys.path.append("../..")
 
-from tetrahedron import tetrahedron, proj_quality
-from metric.metric import Euclid
-
 import pivot_selection
 from generate import point_generator
+from metric.metric import Euclid
+from tetrahedron import proj_quality, tetrahedron
 
 # %%
 metric = Euclid(2)

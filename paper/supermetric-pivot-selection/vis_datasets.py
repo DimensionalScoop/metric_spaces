@@ -18,24 +18,16 @@
 # %load_ext autoreload
 # %autoreload 2
 
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from uncertainties import ufloat
-import seaborn as sns
-from joblib import delayed, Parallel
-from glob import glob
-from warnings import warn
-from tqdm.auto import tqdm
-
 import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 sys.path.append("../..")
 
-from tetrahedron import tetrahedron, proj_quality
-from metric.metric import Euclid
 
-import pivot_selection
 from generate import point_generator
 
 # %%
@@ -61,7 +53,7 @@ df = pd.DataFrame(df).explode(["x", "y"])
 
 # %%
 # TODO: refactor to give the IEEE style it's own file
-from matplotlib import rc, rcParams
+from matplotlib import rcParams
 
 # These lines are needed to get type-1 results:
 # http://nerdjusttyped.blogspot.com/2011/07/type#-1-fonts-and-matplotlib-figures.html

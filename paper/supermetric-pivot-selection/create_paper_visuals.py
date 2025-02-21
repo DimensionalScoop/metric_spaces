@@ -17,25 +17,17 @@
 # %load_ext autoreload
 # %autoreload 2
 
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from uncertainties import ufloat
-import seaborn as sns
-from joblib import delayed, Parallel
+import sys
 from glob import glob
 from warnings import warn
-from tqdm.auto import tqdm
 
-import sys
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 sys.path.append("../..")
 
-from tetrahedron import tetrahedron, proj_quality
-from metric.metric import Euclid
-
-import pivot_selection
-from generate import point_generator
 
 # %%
 # load the files with the expensive optimal results
@@ -44,7 +36,7 @@ PATH = BASE + "paper/supermetric-pivot-selection/results/"
 OUT_PATH = BASE + "paper/supermetric-pivot-selection/fig/"
 files = glob(PATH + "slow-only/*.csv")
 # files += [PATH + "deduplicated-run-1.csv"]
-df = pd.concat((pd.read_csv(f) for f in files))
+df = pd.concat(pd.read_csv(f) for f in files)
 df = df.drop(columns=["Unnamed: 0"])
 df = df.drop_duplicates()
 df = df.query("algorithm in ['hilbert_optimal', 'ccs_optimal']")
@@ -53,7 +45,7 @@ len(set(df.run))
 # %%
 # load additional files with cheaper results
 files = glob(PATH + "fast-only/*.csv")
-add_df = pd.concat((pd.read_csv(f) for f in files)).drop(columns=["Unnamed: 0"])
+add_df = pd.concat(pd.read_csv(f) for f in files).drop(columns=["Unnamed: 0"])
 add_df = add_df.drop_duplicates()
 len(set(add_df.run))
 
@@ -189,7 +181,7 @@ def make_algos_human_readable(df):
     num_algos = len(set(df.algorithm))
     df["algorithm"] = df.algorithm.map(algo_map)
     if num_algos != len(set(df.algorithm)):
-        warn(f"discarding some algorithms entrirely!")
+        warn("discarding some algorithms entrirely!")
     return df
 
 
@@ -324,7 +316,7 @@ style_pivot_table(
 # %%
 
 # %%
-from matplotlib import rc, rcParams
+from matplotlib import rcParams
 
 # These lines are needed to get type-1 results:
 # http://nerdjusttyped.blogspot.com/2010/07/type#-1-fonts-and-matplotlib-figures.html
