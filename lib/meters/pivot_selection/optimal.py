@@ -1,6 +1,6 @@
 import numpy as np
 
-from tetrahedron import tetrahedron, proj_quality
+from ..tetrahedron import tetrahedron, proj_quality
 from .common import METRIC
 
 

@@ -3,10 +3,10 @@ import pandas as pd
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-import pivot_selection
-from generate import point_generator
-from metric.metric import Euclid
-from tetrahedron import proj_quality, tetrahedron
+from meters import pivot_selection
+from meters.generate import point_generator
+from meters.metric.metric import Euclid
+from meters.tetrahedron import proj_quality, tetrahedron
 
 
 def compare_projections(

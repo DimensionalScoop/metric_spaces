@@ -1,4 +1,4 @@
-from metrica.metric import Euclid
+from ..metric import Euclid
 
 METRIC = Euclid(2)
 
