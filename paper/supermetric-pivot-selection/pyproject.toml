@@ -1,0 +1,25 @@
+[project]
+name = "supermetric-pivot-selection"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "DimensionalScoop", email = "m@pernklau.eu" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "bpython>=0.25",
+    "meters",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ipython>=9.2.0",
+]
+
+[tool.uv.sources]
+meters = { path = "../../lib", editable = true }

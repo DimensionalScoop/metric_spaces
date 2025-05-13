@@ -1,10 +1,10 @@
 [project]
-name = "metrica"
-version = "0.1.0"
-description = "Add your description here"
+name = "meters"
+version = "0.1.1"
+description = "collection of tools for metric spaces"
 readme = "README.md"
 authors = [
-    { name = "DimensionalScoop", email = "m@pernklau.eu" }
+    { name = "DimensionalScoop", email = "max.pernklau@fernuni-hagen.de" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -30,4 +30,4 @@ build-backend = "hatchling.build"
 
 
 [tool.hatch.build.targets.wheel]
-packages = ["metrica"]
+packages = ["meters"]

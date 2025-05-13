@@ -8,7 +8,7 @@ import numpy as np
 from sklearn import decomposition
 from sympy.series import order
 
-from metric.metric import Metric, Euclid
+from ..metric.metric import Metric, Euclid
 
 
 def candidate_set_size(points: np.ndarray, r: float, d: Metric, agg="mean") -> Any:
