@@ -1,13 +1,18 @@
+from uuid import uuid4
+from joblib.parallel import itertools
 import numpy as np
 import pandas as pd
 import polars as pl
 import duckdb
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from tqdm import tqdm
-from datetime import datetime
+from datetime import datetime, timedelta
 from pprint import pprint
 import platform
+import time
 import psutil
+import json
+import itertools
 
 from meters import pivot_selection
 from meters.generate import point_generator
@@ -40,104 +45,58 @@ piv_selectors = pivot_selection.get_selection_algos(True)
 CONFIG["datasets"] = list(generators.keys())
 CONFIG["algorithms"] = list(piv_selectors.keys())
 
+db.sql("""
+    CREATE SEQUENCE id_sequence START 1;
+    CREATE TABLE IF NOT EXISTS experiments (
+        id UUID PRIMARY KEY DEFAULT uuid(),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        config json
+        )
+""")
+db.execute("INSERT INTO experiments (config) VALUES (?)", [json.dumps(CONFIG)])
+
 print("starting experiments with this config:")
 pprint(CONFIG)
 
 
-# def run_task(run_id, dim):
-#     r = compare_projections(
-#         generators,
-#         piv_selectors,
-#         [dim],
-#         seed=100 * run_id + dim,
-#         errors="skip",
-#         verbose=False,
-#     )
-#     r["run"] = run_id
-#     return r
+def run_single_experiment(seed, algorithm, dataset_type, dim) -> pl.DataFrame:
+    rng = np.random.default_rng(seed)
+    time.sleep(rng.random() * 0.1)
+    return pl.DataFrame({"a": [1, 2]})
 
 
-# for run_id in range(0, 2000, N_RUNS):
-#     print(f"============ run {run_id} to {run_id + N_RUNS} ==============")
-
-#     jobs = []
-#     for subrun in range(N_RUNS):
-#         for dim in DIMS:
-#             this_run_id = SEED_OFFSET + run_id + subrun
-#             jobs.append(delayed(run_task)(this_run_id, dim))
-
-#     results = pd.concat(Parallel(n_jobs=N_CPUS, verbose=1)(jobs))
-
-#     notes = "-optimal_skipped" if SKIP_OPTIMAL_SELECTORS else ""
-#     results.to_csv(
-#         f"{PATH}fast-only/results_{run_id}-to-{run_id + N_RUNS}_{min(DIMS)}-to-{max(DIMS)}-dims_{N_SAMPLES}{notes}.csv"
-#     )
+# plan all experiments
+def create_jobs():
+    seed = itertools.count(CONFIG["seed"])
+    for algorithm in CONFIG["algorithms"]:
+        for dataset_type in CONFIG["datasets"]:
+            for dim in CONFIG["dims"]:
+                params = (next(seed), algorithm, dataset_type, dim)
+                yield delayed(run_single_experiment)(*params)
 
 
-# def compare_projections(
-#     point_gen: dict,
-#     pivot_selector: dict,
-#     dims: list,
-#     seed=0,
-#     errors="raise",
-#     verbose=False,
-# ):
-#     rv = []
-#     rng = np.random.default_rng(seed)
-#     point_gen_items = point_gen.items()
+jobs = list(create_jobs())
 
-#     if verbose:
-#         if verbose != "mp" or seed % 10 == 0:
-#             point_gen_items = tqdm(
-#                 point_gen_items,
-#                 desc=f"Processing run {run_id} with dimensions {dims}",
-#                 leave=False,
-#             )
+# actually run them
+with parallel_config(backend="loky", inner_max_num_threads=2):
+    runner = Parallel(n_jobs=-1, backend="loky", return_as="generator_unordered")
+    results = runner(jobs)
+    batch = []
+    timer = datetime.now()
 
-#     for dim in dims:
-#         for gen_name, gen_func in point_gen_items:
-#             points = gen_func(dim=dim, rng=rng)
-#             r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
-#             for algo_name, select_pivots in pivot_selector.items():
+    def _save_batch():
+        global timer, batch, db
+        batch_df = pl.concat(batch)
+        try:
+            db.execute("INSERT INTO results SELECT * FROM batch_df")
+        except duckdb.CatalogException:
+            db.execute("CREATE TABLE results AS SELECT * FROM batch_df")
+        batch = []
+        timer = datetime.now()
+        print("batch saved")
 
-#                 def doit():
-#                     p0, p1 = select_pivots(points, rng=rng)
-#                     points_p = tetrahedron.project_to_2d_euclidean(
-#                         points, p0, p1, metric
-#                     )
-#                     rv.append(
-#                         dict(
-#                             dim=dim,
-#                             dataset=gen_name,
-#                             algorithm=algo_name,
-#                             mean_candidate_set_size=proj_quality.candidate_set_size(
-#                                 points_p, r, metric
-#                             ),
-#                             hilbert_quality=proj_quality.hilbert_quality(points_p, r),
-#                             note="",
-#                             seed=seed,
-#                         )
-#                     )
-
-#                 if errors == "skip":
-#                     try:
-#                         doit()
-#                     except:
-#                         print(f"Skipped error at {dim} {gen_name} {algo_name}.")
-#                         rv.append(
-#                             dict(
-#                                 dim=dim,
-#                                 dataset=gen_name,
-#                                 algorithm=algo_name,
-#                                 mean_candidate_set_size=-1,
-#                                 hilbert_quality=-1,
-#                                 note="failed",
-#                                 seed=seed,
-#                             )
-#                         )
-#                 elif errors == "raise":
-#                     doit()
-#                 else:
-#                     raise NotImplementedError()
-#     rv = pd.DataFrame(rv)
-#     return rv
+    for df in tqdm(results, total=len(jobs)):
+        batch.append(df)
+        if timer - datetime.now() > timedelta(seconds=5):
+            _save_batch()
+    _save_batch()

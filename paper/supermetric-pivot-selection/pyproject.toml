@@ -13,6 +13,7 @@ dependencies = [
     "meters",
     "polars>=1.30.0",
     "psutil>=7.0.0",
+    "pyarrow>=20.0.0",
 ]
 
 [build-system]
