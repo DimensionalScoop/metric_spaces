@@ -14,6 +14,7 @@ import psutil
 import json
 import itertools
 
+import experiment
 from meters import pivot_selection
 from meters.generate import point_generator
 from meters.metric.metric import Euclid
@@ -59,12 +60,6 @@ print("starting experiments with this config:")
 pprint(CONFIG)
 
 
-def run_single_experiment(seed, algorithm, dataset_type, dim) -> pl.DataFrame:
-    rng = np.random.default_rng(seed)
-    time.sleep(rng.random() * 0.1)
-    return pl.DataFrame({"a": [1, 2]})
-
-
 # plan all experiments
 def create_jobs():
     seed = itertools.count(CONFIG["seed"])
@@ -72,7 +67,7 @@ def create_jobs():
         for dataset_type in CONFIG["datasets"]:
             for dim in CONFIG["dims"]:
                 params = (next(seed), algorithm, dataset_type, dim)
-                yield delayed(run_single_experiment)(*params)
+                yield delayed(experiment.run)(*params)
 
 
 jobs = list(create_jobs())
