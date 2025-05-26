@@ -55,24 +55,25 @@ def generate_sparse_cluster(rng, n_samples=DEFAULT_SAMPLE_SIZE, dim=7):
     return points
 
 
-def get_generator_dict(n_samples=DEFAULT_SAMPLE_SIZE):
-    return {
-        "univariate, idd": lambda **kwargs: generate_univar_points(
-            **kwargs, homogenious=False, n_samples=n_samples
-        ),
-        "univariate, stretched": lambda **kwargs: generate_univar_points(
-            **kwargs, homogenious=False, n_samples=n_samples
-        ),
-        "gaussian, circular": lambda **kwargs: generate_gaussian_points(
-            **kwargs, homogenious=True, n_samples=n_samples
-        ),
-        "gaussian, eliptic": lambda **kwargs: generate_gaussian_points(
-            **kwargs, homogenious=False, n_samples=n_samples
-        ),
-        "clusters, overlapping": lambda **kwargs: generate_multi_cluster(
-            **kwargs, n_samples=n_samples
-        ),
-        "clusters, sparse": lambda **kwargs: generate_sparse_cluster(
-            **kwargs, n_samples=n_samples
-        ),
-    }
+GENERATORS = {
+    "univariate, idd": lambda **kwargs: generate_univar_points(
+        **kwargs, homogenious=False
+    ),
+    "univariate, stretched": lambda **kwargs: generate_univar_points(
+        **kwargs,
+        homogenious=False,
+    ),
+    "gaussian, circular": lambda **kwargs: generate_gaussian_points(
+        **kwargs, homogenious=True
+    ),
+    "gaussian, eliptic": lambda **kwargs: generate_gaussian_points(
+        **kwargs,
+        homogenious=False,
+    ),
+    "clusters, overlapping": lambda **kwargs: generate_multi_cluster(
+        **kwargs,
+    ),
+    "clusters, sparse": lambda **kwargs: generate_sparse_cluster(
+        **kwargs,
+    ),
+}

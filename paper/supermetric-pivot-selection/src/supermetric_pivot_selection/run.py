@@ -13,15 +13,15 @@ import time
 import psutil
 import json
 import itertools
+from frozendict import frozendict
 
 import experiment
 from meters import pivot_selection
-from meters.generate import point_generator
+from meters.generate.point_generator import GENERATORS as POINT_GENERATORS
 from meters.metric.metric import Euclid
 from meters.tetrahedron import proj_quality, tetrahedron
 
-
-metric = Euclid(2)
+EXPERIMENT_ID = uuid4()
 
 CONFIG = dict(
     metric=("Euclidean", 2),
@@ -40,7 +40,7 @@ PATH = f"results/experiment_{datetime.now().isoformat()}.duck"
 CONFIG["file"] = PATH
 db = duckdb.connect(PATH)
 
-generators = point_generator.get_generator_dict(CONFIG["n_samples"])
+generators = POINT_GENERATORS
 piv_selectors = pivot_selection.get_selection_algos(True)
 
 CONFIG["datasets"] = list(generators.keys())
@@ -54,7 +54,12 @@ db.sql("""
         config json
         )
 """)
-db.execute("INSERT INTO experiments (config) VALUES (?)", [json.dumps(CONFIG)])
+db.execute(
+    "INSERT INTO experiments (id, config) VALUES (?, ?)",
+    [EXPERIMENT_ID, json.dumps(CONFIG)],
+)
+# only add it now, so the id isn't stored twice in the DB
+CONFIG["experiment_id"] = EXPERIMENT_ID
 
 print("starting experiments with this config:")
 pprint(CONFIG)
@@ -63,10 +68,11 @@ pprint(CONFIG)
 # plan all experiments
 def create_jobs():
     seed = itertools.count(CONFIG["seed"])
+    config = frozendict(CONFIG)
     for algorithm in CONFIG["algorithms"]:
         for dataset_type in CONFIG["datasets"]:
             for dim in CONFIG["dims"]:
-                params = (next(seed), algorithm, dataset_type, dim)
+                params = (next(seed), algorithm, dataset_type, dim, config)
                 yield delayed(experiment.run)(*params)
 
 
@@ -74,24 +80,26 @@ jobs = list(create_jobs())
 
 # actually run them
 with parallel_config(backend="loky", inner_max_num_threads=2):
-    runner = Parallel(n_jobs=-1, backend="loky", return_as="generator_unordered")
+    runner = Parallel(n_jobs=-1, return_as="generator_unordered", verbose=3)
     results = runner(jobs)
     batch = []
     timer = datetime.now()
 
     def _save_batch():
+        print("saving batch...", end="")
         global timer, batch, db
-        batch_df = pl.concat(batch)
+        batch_df = pl.concat(batch).to_pandas()
         try:
             db.execute("INSERT INTO results SELECT * FROM batch_df")
         except duckdb.CatalogException:
             db.execute("CREATE TABLE results AS SELECT * FROM batch_df")
+        db.execute("CHECKPOINT")  # flush changes to disk
         batch = []
         timer = datetime.now()
-        print("batch saved")
+        print(" done!")
 
     for df in tqdm(results, total=len(jobs)):
-        batch.append(df)
-        if timer - datetime.now() > timedelta(seconds=5):
+        batch.append(pl.DataFrame(df))
+        if datetime.now() - timer > timedelta(seconds=5):
             _save_batch()
     _save_batch()
