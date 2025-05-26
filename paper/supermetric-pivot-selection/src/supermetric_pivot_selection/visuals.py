@@ -171,6 +171,9 @@ ex = make_algos_human_readable(normalized_res.copy())
 # XXX: why are there nan algos?
 ex = ex.query("dataset == 'uniform, stretched'")
 sns.lineplot(ex, x="dim", y="hilbert_quality", hue="algorithm")
+plt.show()
+# %%
+
 
 # %%
 # create tables
@@ -295,8 +298,6 @@ style_pivot_table(
 
 
 # %%
-
-# %%
 from matplotlib import rcParams
 
 # These lines are needed to get type-1 results:
@@ -402,6 +403,7 @@ def plot_hilbert():
 
 
 plot_hilbert()
+plt.show()
 
 
 # %%
