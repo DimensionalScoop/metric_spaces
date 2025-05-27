@@ -119,14 +119,13 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
         points_p, queries_p, r, metric
     )
 
-    part = proj_quality.HilbertPartitioner(points)
-    rv["useful_partition_size"] = part.hyperplane_quality(points, r)
-    rv["single_partition_query_share"] = part.is_query_in_one_partition(queries, r)
+    part = proj_quality.HilbertPartitioner(points_p)
+    rv["useful_partition_size"] = part.hyperplane_quality(points_p, r)
+    rv["single_partition_query_share"] = part.is_query_in_one_partition(queries_p, r)
 
-    part = proj_quality.HilbertPartitioner(points, dummy_transform=True)
-    rv["dummy_useful_partition_size"] = part.hyperplane_quality(points, r)
-    rv["dummy_single_partition_query_share"] = part.is_query_in_one_partition(
-        queries, r
+    dummy_part = proj_quality.HilbertPartitioner(points_p, dummy_transform=True)
+    rv["dummy_useful_partition_size"] = dummy_part.hyperplane_quality(points_p, r)
+    rv["dummy_single_partition_query_share"] = dummy_part.is_query_in_one_partition(
+        queries_p, r
     )
-
     return rv

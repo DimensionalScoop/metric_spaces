@@ -24,6 +24,8 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "ipython>=9.2.0",
+    "jupyter>=1.1.1",
+    "jupytext>=1.17.1",
     "pudb>=2025.1",
 ]
 
