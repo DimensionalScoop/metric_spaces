@@ -101,9 +101,15 @@ with parallel_config(backend="loky", inner_max_num_threads=2):
     timer = datetime.now()
 
     def _save_batch():
-        print("saving batch...", end="")
+        logging.info("saving batch...", end="")
         global timer, batch, db
-        batch_df = pl.concat(batch).to_pandas()
+
+        try:
+            batch_df = pd.DataFrame(batch)
+        except:
+            logging.exception()
+            logging.critical()
+
         try:
             db.execute("INSERT INTO results SELECT * FROM batch_df")
         except duckdb.CatalogException:
@@ -111,10 +117,14 @@ with parallel_config(backend="loky", inner_max_num_threads=2):
         db.execute("CHECKPOINT")  # flush changes to disk
         batch = []
         timer = datetime.now()
-        print(" done!")
+        logging.info("done saving batch!")
 
-    for df in tqdm(results, total=len(jobs)):
-        batch.append(pl.DataFrame(df))
-        if datetime.now() - timer > timedelta(seconds=5):
-            _save_batch()
-    _save_batch()
+    try:
+        for df in tqdm(results, total=len(jobs)):
+            batch.append(df)
+            if datetime.now() - timer > timedelta(seconds=5):
+                _save_batch()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        _save_batch()
