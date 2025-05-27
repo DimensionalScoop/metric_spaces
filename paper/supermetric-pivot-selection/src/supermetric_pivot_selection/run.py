@@ -37,10 +37,10 @@ EXPERIMENT_ID = uuid4()
 
 CONFIG = dict(
     metric=("Euclidean", 2),
-    n_runs=20,
+    n_runs=1,
     n_samples=512,
     dims=list(range(2, 18)),
-    n_cpus=1,
+    n_cpus=-1,
     seed=abs(hash(datetime.now())),
 )
 

@@ -46,6 +46,30 @@ seed = 2290903097003539631 + 33
 algorithm = "maximize_dist"
 dataset_type = "clusters, sparse"
 dim = 2
+
+# %%
+algorithm = "IS_pto_1.5"
+seed = 352537156968997297
+dataset_type = "univariate, idd"
+dim = 2
+
+# %%
+algorithm = "IS_pto_1.5_greedy"
+seed = 352537156968997569
+dataset_type = "clusters, sparse"
+dim = 2
+
+# %%
+"│ IS_pto_1.5_greedy │  │           │ eliptic         │     3 │"
+
+# %%
+algorithm = "IS_pto_1.5_greedy"
+seed = 352537156968997538
+dataset_type = "gaussian, eliptic"
+dim = 3
+
+# %%
+
 config = dict(n_samples=512)
 
 
@@ -87,7 +111,8 @@ settings = dict(legend=None, hue=points[:, 0], s=3)
 plt.subplot(2, 2, 1)
 plt.title("original space")
 sns.scatterplot(x=points[:, 0], y=points[:, 1], **settings)
-plt.scatter(*np.array([p0, p1]))
+pivots = np.array([p0, p1])
+plt.scatter(pivots[:, 0], pivots[:, 1])
 
 plt.subplot(2, 2, 2)
 plt.title("pivot space")
