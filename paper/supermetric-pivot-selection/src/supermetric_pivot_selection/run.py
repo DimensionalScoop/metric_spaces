@@ -40,7 +40,7 @@ CONFIG = dict(
     n_runs=1,
     n_samples=512,
     dims=list(range(2, 18)),
-    n_cpus=-1,
+    n_cpus=1,
     seed=abs(hash(datetime.now())),
 )
 

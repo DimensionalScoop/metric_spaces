@@ -74,8 +74,11 @@ class HilbertPartitioner:
         # PCA is not exactly the same as finding the most faraway points.
 
         if not dummy_transform:
-            self.pca = decomposition.PCA(n_components=1)
-            projection = self.pca.fit_transform(points)
+            try:
+                self.pca = decomposition.PCA(n_components=1)
+                projection = self.pca.fit_transform(points)
+            except ValueError:
+                return
         else:
 
             class DummyPCA:
@@ -90,20 +93,27 @@ class HilbertPartitioner:
 
     def hyperplane_quality(self, points, r):
         """Returns the share of points that further than `r` away from the hyperplane"""
-        left, right = self.get_partitions(points, r)
+        try:
+            left, right = self.get_partitions(points, r)
 
-        count_partitioned_points = len(left) + len(right)
-        return count_partitioned_points / len(points)
+            count_partitioned_points = len(left) + len(right)
+            return count_partitioned_points / len(points)
+        except ValueError:
+            return -1
 
     def is_query_in_one_partition(self, queries, r):
         """Returns the share of range queries that only retrive elements from one partition.
 
         I.e. the partitioning can be used to speed up the query.
         `queries` should have the shape [number of queries, dimensionality]."""
-        projection = self.pca.transform(queries)
-        distance_to_border = np.abs(projection - self.hyperplane)
-        n_far_away = (distance_to_border > r).sum()
-        return n_far_away / len(queries)
+
+        try:
+            projection = self.pca.transform(queries)
+            distance_to_border = np.abs(projection - self.hyperplane)
+            n_far_away = (distance_to_border > r).sum()
+            return n_far_away / len(queries)
+        except ValueError:
+            return -1
 
     def get_partitions(self, points, r):
         """Return point indices that are in the (left, right) partition and further
