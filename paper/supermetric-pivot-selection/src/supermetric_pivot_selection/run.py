@@ -14,6 +14,7 @@ import psutil
 import json
 import itertools
 from frozendict import frozendict
+import logging
 
 import experiment
 from meters import pivot_selection
@@ -21,22 +22,34 @@ from meters.generate.point_generator import GENERATORS as POINT_GENERATORS
 from meters.metric.metric import Euclid
 from meters.tetrahedron import proj_quality, tetrahedron
 
+
+PATH = f"results/experiment_{datetime.now().isoformat()}"
+DB_FILE = PATH + ".duck"
+LOG_FILE = PATH + ".log"
+
+logging.basicConfig(
+    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()],
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
 EXPERIMENT_ID = uuid4()
 
 CONFIG = dict(
     metric=("Euclidean", 2),
-    n_runs=8,
+    n_runs=20,
     n_samples=512,
     dims=list(range(2, 18)),
     n_cpus=-1,
-    seed=0xDEAD,
+    seed=hash(datetime.now()),
 )
 
 CONFIG["machine_os"] = platform.system() + " " + platform.release()
 CONFIG["machine_mem_GB"] = int(psutil.virtual_memory().total / 1e9)
 CONFIG["machine_cores"] = psutil.cpu_count()
 
-PATH = f"results/experiment_{datetime.now().isoformat()}.duck"
 CONFIG["file"] = PATH
 db = duckdb.connect(PATH)
 
@@ -63,17 +76,19 @@ CONFIG["experiment_id"] = EXPERIMENT_ID
 
 print("starting experiments with this config:")
 pprint(CONFIG)
+logging.info(CONFIG)
 
 
 # plan all experiments
 def create_jobs():
     seed = itertools.count(CONFIG["seed"])
     config = frozendict(CONFIG)
-    for algorithm in CONFIG["algorithms"]:
-        for dataset_type in CONFIG["datasets"]:
-            for dim in CONFIG["dims"]:
-                params = (next(seed), algorithm, dataset_type, dim, config)
-                yield delayed(experiment.run)(*params)
+    for _ in range(CONFIG["n_runs"]):
+        for algorithm in CONFIG["algorithms"]:
+            for dataset_type in CONFIG["datasets"]:
+                for dim in CONFIG["dims"]:
+                    params = (next(seed), algorithm, dataset_type, dim, config)
+                    yield delayed(experiment.run)(*params)
 
 
 jobs = list(create_jobs())

@@ -13,6 +13,7 @@ import time
 import psutil
 import json
 import itertools
+import logging
 
 from meters import pivot_selection
 from meters.generate import point_generator
@@ -20,7 +21,8 @@ from meters.metric.metric import Euclid
 from meters.tetrahedron import proj_quality, tetrahedron
 
 ALL_ALGORITHMS = pivot_selection.get_selection_algos()
-RAISE_EXCEPTIONS = True
+RAISE_EXCEPTIONS = False
+logger = logging.getLogger(__name__)
 
 
 def run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -> dict:
@@ -46,6 +48,11 @@ def run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) ->
         error = _generate_error_message(
             e, seed, algorithm, dataset_type, dim, config, start_time
         )
+        logger.exception(
+            "function arguments",
+            dict(seed=seed, algorithm=algorithm, dataset_type=dataset_type, dim=dim),
+        )
+        logger.info("CONFIG for above exception", config)
         if RAISE_EXCEPTIONS:
             raise
         return error
