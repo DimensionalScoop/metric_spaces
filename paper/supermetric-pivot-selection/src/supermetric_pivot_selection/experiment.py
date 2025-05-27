@@ -21,7 +21,7 @@ from meters.metric.metric import Euclid
 from meters.tetrahedron import proj_quality, tetrahedron
 
 ALL_ALGORITHMS = pivot_selection.get_selection_algos()
-RAISE_EXCEPTIONS = False
+RAISE_EXCEPTIONS = True
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +35,10 @@ SCHEMA = pl.Schema(
         ("dim", pl.Int64),
         ("runtime_sec", pl.Float64),
         ("candidate_set_size", pl.Float64),
-        ("userful_partition_size", pl.Float64),
+        ("useful_partition_size", pl.Float64),
+        ("single_partition_query_share", pl.Float64),
+        ("dummy_useful_partition_size", pl.Float64),
+        ("dummy_single_partition_query_share", pl.Float64),
         ("notes", pl.String),
     ]
 )
@@ -59,14 +62,18 @@ def run(
         rv["dataset_supertype"] = dataset_type
         rv["dataset_subtype"] = ""
     rv["dim"] = dim
+    rv["candidate_set_size"] = np.nan
+    rv["useful_partition_size"] = np.nan
+    rv["single_partition_query_share"] = np.nan
+    rv["dummy_useful_partition_size"] = np.nan
+    rv["dummy_single_partition_query_share"] = np.nan
+    rv["notes"] = "{}"
 
     # run experiment
     try:
         run_result = _run(seed, algorithm, dataset_type, dim, config)
         rv.update(run_result)
     except Exception as e:
-        rv["candidate_set_size"] = -1
-        rv["useful_partition_size"] = -1
         rv["notes"] = json.dumps(dict(error_type=type(e).__name__, message=str(e)))
 
         logger.exception(
@@ -97,15 +104,29 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
     rng = np.random.default_rng(seed)
 
     points = generate_points(rng=rng, dim=dim, n_samples=config["n_samples"])
+    # example queries
+    queries = generate_points(rng=rng, dim=dim, n_samples=config["n_samples"])
+    # TODO: use queries instead of points
     r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
-    p0, p1 = select_pivots(points, rng=rng)
-    points_p = tetrahedron.project_to_2d_euclidean(points, p0, p1, metric)
-    candidate_set_size = proj_quality.candidate_set_size(points_p, r, metric)
-    useful_partition_size = proj_quality.hilbert_quality(points_p, r)
 
+    p0, p1 = select_pivots(points, rng=rng)
+    proj_conf = dict(p0=p0, p1=p1, dist_func=metric)
+    points_p = tetrahedron.project_to_2d_euclidean(points, **proj_conf)
+    queries_p = tetrahedron.project_to_2d_euclidean(queries, **proj_conf)
     rv = dict()
-    rv["candidate_set_size"] = candidate_set_size
-    rv["userful_partition_size"] = useful_partition_size
-    rv["notes"] = "{}"
+
+    rv["candidate_set_size"] = proj_quality.candidate_set_size(
+        points_p, queries_p, r, metric
+    )
+
+    part = proj_quality.HilbertPartitioner(points)
+    rv["useful_partition_size"] = part.hyperplane_quality(points, r)
+    rv["single_partition_query_share"] = part.is_query_in_one_partition(queries, r)
+
+    part = proj_quality.HilbertPartitioner(points, dummy_transform=True)
+    rv["dummy_useful_partition_size"] = part.hyperplane_quality(points, r)
+    rv["dummy_single_partition_query_share"] = part.is_query_in_one_partition(
+        queries, r
+    )
 
     return rv

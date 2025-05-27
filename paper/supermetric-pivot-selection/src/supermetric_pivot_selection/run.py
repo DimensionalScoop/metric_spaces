@@ -19,8 +19,6 @@ import logging
 import experiment
 from meters import pivot_selection
 from meters.generate.point_generator import GENERATORS as POINT_GENERATORS
-from meters.metric.metric import Euclid
-from meters.tetrahedron import proj_quality, tetrahedron
 
 
 PATH = f"results/experiment_{datetime.now().isoformat()}"
@@ -42,7 +40,7 @@ CONFIG = dict(
     n_runs=20,
     n_samples=512,
     dims=list(range(2, 18)),
-    n_cpus=-1,
+    n_cpus=1,
     seed=abs(hash(datetime.now())),
 )
 
@@ -95,7 +93,7 @@ jobs = list(create_jobs())
 
 # actually run them
 with parallel_config(backend="loky", inner_max_num_threads=2):
-    runner = Parallel(n_jobs=-1, return_as="generator_unordered")
+    runner = Parallel(n_jobs=CONFIG["n_cpus"], return_as="generator_unordered")
     results = runner(jobs)
     batch = []
     timer = datetime.now()
