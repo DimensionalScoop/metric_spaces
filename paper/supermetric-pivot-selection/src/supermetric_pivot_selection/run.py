@@ -50,8 +50,8 @@ CONFIG["machine_os"] = platform.system() + " " + platform.release()
 CONFIG["machine_mem_GB"] = int(psutil.virtual_memory().total / 1e9)
 CONFIG["machine_cores"] = psutil.cpu_count()
 
-CONFIG["file"] = PATH
-db = duckdb.connect(PATH)
+CONFIG["files"] = PATH
+db = duckdb.connect(DB_FILE)
 
 generators = POINT_GENERATORS
 piv_selectors = pivot_selection.get_selection_algos(True)
@@ -95,25 +95,26 @@ jobs = list(create_jobs())
 
 # actually run them
 with parallel_config(backend="loky", inner_max_num_threads=2):
-    runner = Parallel(n_jobs=-1, return_as="generator_unordered", verbose=3)
+    runner = Parallel(n_jobs=-1, return_as="generator_unordered")
     results = runner(jobs)
     batch = []
     timer = datetime.now()
 
     def _save_batch():
-        logging.info("saving batch...", end="")
+        logging.info("saving batch...")
         global timer, batch, db
 
         try:
-            batch_df = pd.DataFrame(batch)
+            # weird things happen trying to put a polars df
+            # into the duckdb database, so stick with pandas for now
+            batch_df = pd.concat(batch)
+            try:
+                db.execute("INSERT INTO results SELECT * FROM batch_df")
+            except duckdb.CatalogException:
+                db.execute("CREATE TABLE results AS SELECT * FROM batch_df")
         except:
-            logging.exception()
-            logging.critical()
+            logging.exception("while saving batch to db")
 
-        try:
-            db.execute("INSERT INTO results SELECT * FROM batch_df")
-        except duckdb.CatalogException:
-            db.execute("CREATE TABLE results AS SELECT * FROM batch_df")
         db.execute("CHECKPOINT")  # flush changes to disk
         batch = []
         timer = datetime.now()
@@ -125,6 +126,6 @@ with parallel_config(backend="loky", inner_max_num_threads=2):
             if datetime.now() - timer > timedelta(seconds=5):
                 _save_batch()
     except KeyboardInterrupt:
-        pass
+        logging.warning("user keyboard interrupt")
     finally:
         _save_batch()
