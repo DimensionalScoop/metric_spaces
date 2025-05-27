@@ -53,6 +53,11 @@ def hilbert_quality(points, r):
     return part.hyperplane_quality(points, r)
 
 
+def query_usable_partitioning(points, queries, r):
+    part = HilbertPartitioner(points)
+    return part.is_query_in_one_partition(queries, r)
+
+
 class HilbertPartitioner:
     """Finds a hyperplane bisecting the dataset which tries to maximize
     the number of partitioned points.

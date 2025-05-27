@@ -1,3 +1,4 @@
+from socket import INADDR_MAX_LOCAL_GROUP
 from uuid import uuid4
 from joblib.parallel import itertools
 import numpy as np
@@ -72,7 +73,19 @@ def run(
     # run experiment
     try:
         run_result = _run(seed, algorithm, dataset_type, dim, config)
-        rv.update(run_result)
+        # record additional metadata
+        rv["runtime_sec"] = (datetime.now() - start_time).total_seconds()
+
+        if algorithm != "optimal":
+            rv.update(run_result)
+        else:
+            new_rv = []
+            for res in run_result:
+                r = rv.copy()
+                r.update(res)
+                new_rv.append(r)
+            rv = new_rv
+
     except Exception as e:
         rv["notes"] = json.dumps(dict(error_type=type(e).__name__, message=str(e)))
 
@@ -83,9 +96,6 @@ def run(
         logger.info("CONFIG for above exception", config)
         if RAISE_EXCEPTIONS:
             raise
-
-    # record additional metadata
-    rv["runtime_sec"] = (datetime.now() - start_time).total_seconds()
 
     df = pl.DataFrame(rv, schema=SCHEMA, strict=False)
     # polars df isn't serializable yet
@@ -109,7 +119,21 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
     # TODO: use queries instead of points
     r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
 
-    p0, p1 = select_pivots(points, rng=rng)
+    if algorithm != "optimal":
+        p0, p1 = select_pivots(points, rng=rng)
+        rv = _project_and_measure(p0, p1, metric, points, queries, r)
+        return rv
+    else:
+        optimize_pivots = select_pivots
+        all_rvs = []
+        for name, (p0, p1) in optimize_pivots(points, queries, r).items():
+            result = _project_and_measure(p0, p1, metric, points, queries, r)
+            result["algorithm"] = name
+            all_rvs.append(result)
+        return all_rvs
+
+
+def _project_and_measure(p0, p1, metric, points, queries, r):
     proj_conf = dict(p0=p0, p1=p1, dist_func=metric)
     points_p = tetrahedron.project_to_2d_euclidean(points, **proj_conf)
     queries_p = tetrahedron.project_to_2d_euclidean(queries, **proj_conf)
