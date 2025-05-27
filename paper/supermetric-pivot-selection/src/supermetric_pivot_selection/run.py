@@ -43,7 +43,7 @@ CONFIG = dict(
     n_samples=512,
     dims=list(range(2, 18)),
     n_cpus=-1,
-    seed=hash(datetime.now()),
+    seed=abs(hash(datetime.now())),
 )
 
 CONFIG["machine_os"] = platform.system() + " " + platform.release()
