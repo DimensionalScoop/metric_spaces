@@ -105,7 +105,7 @@ with parallel_config(backend="loky", inner_max_num_threads=2):
         try:
             # weird things happen trying to put a polars df
             # into the duckdb database, so stick with pandas for now
-            batch_df = pd.concat(batch)
+            batch_df = pd.concat(batch)  # noqa: F841
             try:
                 db.execute("INSERT INTO results SELECT * FROM batch_df")
             except duckdb.CatalogException:

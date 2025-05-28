@@ -98,7 +98,7 @@ class HilbertPartitioner:
 
             count_partitioned_points = len(left) + len(right)
             return count_partitioned_points / len(points)
-        except ValueError:
+        except (ValueError, AttributeError):
             return -1
 
     def is_query_in_one_partition(self, queries, r):
@@ -112,7 +112,7 @@ class HilbertPartitioner:
             distance_to_border = np.abs(projection - self.hyperplane)
             n_far_away = (distance_to_border > r).sum()
             return n_far_away / len(queries)
-        except ValueError:
+        except (ValueError, AttributeError):
             return -1
 
     def get_partitions(self, points, r):
