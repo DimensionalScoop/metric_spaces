@@ -4,6 +4,7 @@ from ctypes import ArgumentError
 import numpy as np
 from scipy import spatial
 import numexpr
+import line_profiler
 
 from . import fast_distance_matrix
 
@@ -90,11 +91,12 @@ class Euclid(Metric):
 
     def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
         n_axis = max((len(a.shape), len(b.shape)))
+        # return np.sqrt(np.sum((a-b)**2, axis=n_axis-1))
         return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[n_axis - 1]))
 
     def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
         if a is not b:
-            return super().distance_matrix(a, b)
+            return fast_distance_matrix.euclidean_distance_matrix(a, b)
         else:
             return fast_distance_matrix.euclid(a)
 

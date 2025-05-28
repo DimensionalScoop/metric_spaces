@@ -35,3 +35,35 @@ def euclid(pts):
             dists[y, x] = res
 
     return dists
+
+
+@njit(boundscheck=False, fastmath=True)
+def euclidean_distance_matrix(x, y):
+    """
+    Compute Euclidean distance matrix between two sets of vectors.
+
+    Parameters:
+    -----------
+    x : array-like, shape (m, k)
+        First set of vectors
+    y : array-like, shape (n, k)
+        Second set of vectors
+
+    Returns:
+    --------
+    distances : ndarray, shape (m, n)
+        Distance matrix where distances[i, j] is the distance between x[i] and y[j]
+    """
+    m, k = x.shape
+    n = y.shape[0]
+    distances = np.empty((m, n), dtype=np.float32)
+
+    for i in range(m):
+        for j in range(n):
+            dist_sq = 0.0
+            for d in range(k):
+                diff = x[i, d] - y[j, d]
+                dist_sq += diff * diff
+            distances[i, j] = dist_sq
+
+    return np.sqrt(distances)

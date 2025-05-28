@@ -15,6 +15,7 @@ import psutil
 import json
 import itertools
 import logging
+import line_profiler
 
 from meters import pivot_selection
 from meters.generate import point_generator
@@ -102,6 +103,7 @@ def run(
     return df.to_pandas()
 
 
+@line_profiler.profile
 def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -> dict:
     """Actually runs the experiment."""
 
@@ -115,7 +117,7 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
 
     points = generate_points(rng=rng, dim=dim, n_samples=config["n_samples"])
     # example queries
-    queries = generate_points(rng=rng, dim=dim, n_samples=config["n_samples"])
+    queries = generate_points(rng=rng, dim=dim, n_samples=config["n_queries"])
     # TODO: use queries instead of points
     r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
 
@@ -126,7 +128,9 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
     else:
         optimize_pivots = select_pivots
         all_rvs = []
-        for name, (p0, p1) in optimize_pivots(points, queries, r).items():
+        for name, (p0, p1) in optimize_pivots(
+            points, queries, r, verbose=config["verbose"]
+        ).items():
             result = _project_and_measure(p0, p1, metric, points, queries, r)
             result["algorithm"] = name
             all_rvs.append(result)

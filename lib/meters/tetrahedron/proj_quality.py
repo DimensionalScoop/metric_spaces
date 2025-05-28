@@ -6,7 +6,9 @@ E.g.: quality of a hyperplane projection
 from typing import *
 import numpy as np
 from sklearn import decomposition
+import scipy
 from sympy.series import order
+import line_profiler
 
 from ..metric.metric import Metric, Euclid
 

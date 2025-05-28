@@ -1,4 +1,6 @@
 import numpy as np
+from tqdm import tqdm
+import line_profiler
 
 from ..tetrahedron import tetrahedron, proj_quality
 from .common import METRIC
@@ -16,19 +18,25 @@ OPTIMAL_METHODS = [
 ]
 
 
-def optimize_pivots(points, queries, r, return_full=False) -> dict:
+def optimize_pivots(points, queries, r, return_full=False, verbose=False) -> dict:
     return {
         name: points[pivot_idx]
         for name, pivot_idx in zip(
-            OPTIMAL_METHODS, list(_optimize_pivots(points, queries, r, return_full))
+            OPTIMAL_METHODS,
+            list(_optimize_pivots(points, queries, r, return_full, verbose)),
         )
     }
 
 
-def _optimize_pivots(points, queries, r, return_full=False):
+# @line_profiler.profile
+def _optimize_pivots(points, queries, r, return_full=False, verbose=False):
     all_quality = np.nan * np.ones([3, len(points), len(points)], float)
 
-    for i, p0 in enumerate(points):
+    outer_loop = tqdm(points) if verbose else points
+
+    for i, p0 in enumerate(outer_loop):
+        if i > 10:
+            break
         for j, p1 in enumerate(points):
             if j <= i:
                 continue
