@@ -6,15 +6,23 @@ E.g.: quality of a hyperplane projection
 from typing import *
 import numpy as np
 from sklearn import decomposition
+from sklearn.neighbors import KDTree
 import scipy
 from sympy.series import order
+
 import line_profiler
 
 from ..metric.metric import Metric, Euclid
 
 
+@line_profiler.profile
 def candidate_set_size(
-    points: np.ndarray, queries: np.ndarray, r: float, d: Metric, agg="mean"
+    points: np.ndarray,
+    queries: np.ndarray,
+    r: float,
+    d: Metric,
+    agg="mean",
+    use_kdtree=True,
 ) -> Any:
     """Run a range query with `r` on all `query` points. How big is the candidate set?
 
@@ -27,19 +35,22 @@ def candidate_set_size(
             "mean": np.mean
             callable: function that takes an np.ndarray and returns a float
     """
-    dist_matrix = d.distance_matrix(queries, points)
+    if use_kdtree:
+        assert isinstance(d, Euclid), f"metric {d} not supported"
+        tree = KDTree(points)
+        counts = tree.query_radius(queries, r, count_only=True)
+        return counts.sum() / len(queries)
+    else:
+        if agg is None:
+            dist_matrix = d.distance_matrix(queries, points)
+            n_neighbours = (dist_matrix < r).sum(axis=-1)
+            return n_neighbours
+        else:
+            return d.count_query_hits(points, queries, r) / len(queries)
 
-    n_neighbours = (dist_matrix < r).sum(axis=-1)
 
-    if agg is None:
-        return n_neighbours
-    elif agg == "mean":
-        agg = np.mean
-    return agg(n_neighbours)
-
-
-def get_average_k_nn_dist(points, d: Metric, k=10, agg="mean"):
-    dist_m = d.distance_matrix(points, points)
+def get_average_k_nn_dist(points, queries, d: Metric, k=10, agg="mean"):
+    dist_m = d.distance_matrix(queries, points)
     dist_m = np.sort(dist_m, axis=1)
     k_dist = dist_m[:, k - 1]
 
@@ -77,7 +88,9 @@ class HilbertPartitioner:
 
         if not dummy_transform:
             try:
-                self.pca = decomposition.PCA(n_components=1)
+                self.pca = decomposition.PCA(
+                    n_components=1
+                )  # , svd_solver='randomized')
                 projection = self.pca.fit_transform(points)
             except ValueError:
                 return

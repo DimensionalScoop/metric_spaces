@@ -54,6 +54,9 @@ class Metric:
                     result[:, j] = self(x, y[j])
             return result
 
+        def count_query_hits(self, points, queries, r):
+            raise NotImplementedError()
+
 
 class ProbMetric(Metric):
     """A metric that compares two probability distributions
@@ -99,6 +102,9 @@ class Euclid(Metric):
             return fast_distance_matrix.euclidean_distance_matrix(a, b)
         else:
             return fast_distance_matrix.euclid(a)
+
+    def count_query_hits(self, points, queries, r):
+        return fast_distance_matrix.euclidean_range_query_hits(points, queries, r)
 
 
 class PNorm(Metric):

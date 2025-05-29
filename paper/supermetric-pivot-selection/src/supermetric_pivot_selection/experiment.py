@@ -103,7 +103,7 @@ def run(
     return df.to_pandas()
 
 
-@line_profiler.profile
+# @line_profiler.profile
 def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -> dict:
     """Actually runs the experiment."""
 
@@ -118,8 +118,7 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
     points = generate_points(rng=rng, dim=dim, n_samples=config["n_samples"])
     # example queries
     queries = generate_points(rng=rng, dim=dim, n_samples=config["n_queries"])
-    # TODO: use queries instead of points
-    r = proj_quality.get_average_k_nn_dist(points, metric, k=10)
+    r = proj_quality.get_average_k_nn_dist(points, queries, metric, k=10)
 
     if algorithm != "optimal":
         p0, p1 = select_pivots(points, rng=rng)

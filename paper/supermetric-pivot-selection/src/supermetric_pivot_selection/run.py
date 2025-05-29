@@ -97,10 +97,10 @@ def run(**config_overwrite):
         batch = []
         timer = datetime.now()
 
-        def _save_batch():
+        def _save_batch(timer, batch):
             logging.info("saving batch...")
-            global timer, batch
-
+            if len(batch) == 0:
+                logging.info("nothing to save.")
             try:
                 # weird things happen trying to put a polars df
                 # into the duckdb database, so stick with pandas for now
@@ -113,19 +113,20 @@ def run(**config_overwrite):
                 logging.exception("while saving batch to db")
 
             db.execute("CHECKPOINT")  # flush changes to disk
+            logging.info("done saving batch!")
             batch = []
             timer = datetime.now()
-            logging.info("done saving batch!")
+            return timer, batch
 
         try:
             for df in tqdm(results, total=len(jobs)):
                 batch.append(df)
                 if datetime.now() - timer > timedelta(seconds=5):
-                    _save_batch()
+                    timer, batch = _save_batch(timer, batch)
         except KeyboardInterrupt:
             logging.warning("user keyboard interrupt")
         finally:
-            _save_batch()
+            _save_batch(timer, batch)
 
 
 if __name__ == "__main__":

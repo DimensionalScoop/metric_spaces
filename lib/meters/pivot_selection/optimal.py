@@ -1,9 +1,13 @@
 import numpy as np
 from tqdm import tqdm
 import line_profiler
+import matplotlib.pyplot as plt
 
 from ..tetrahedron import tetrahedron, proj_quality
 from .common import METRIC
+
+
+DEBUG = False
 
 
 def __mask_diag(a):
@@ -28,32 +32,51 @@ def optimize_pivots(points, queries, r, return_full=False, verbose=False) -> dic
     }
 
 
-# @line_profiler.profile
-def _optimize_pivots(points, queries, r, return_full=False, verbose=False):
+@line_profiler.profile
+def _optimize_pivots(points, queries, r, return_full=False, verbose=True):
     all_quality = np.nan * np.ones([3, len(points), len(points)], float)
 
-    outer_loop = tqdm(points) if verbose else points
+    if DEBUG:
+        all_iters = []
+        all_quals = []
+        plt.ion()
 
-    for i, p0 in enumerate(outer_loop):
-        if i > 10:
-            break
+    if verbose:
+        max_iter = (len(points) ** 2 + len(points)) // 2
+        iters = iter(tqdm(range(max_iter), total=max_iter))
+    for i, p0 in enumerate(points):
         for j, p1 in enumerate(points):
-            if j <= i:
-                continue
-            try:
-                points_p = tetrahedron.project_to_2d_euclidean(points, p0, p1, METRIC)
-                queries_p = tetrahedron.project_to_2d_euclidean(queries, p0, p1, METRIC)
+            if j >= i:
+                break
+            if verbose:
+                next(iters)
+            points_p = tetrahedron.project_to_2d_euclidean(points, p0, p1, METRIC)
+            queries_p = tetrahedron.project_to_2d_euclidean(queries, p0, p1, METRIC)
 
-                all_quality[0, i, j] = proj_quality.candidate_set_size(
-                    points_p, queries_p, r, METRIC
-                )
+            all_quality[0, i, j] = proj_quality.candidate_set_size(
+                points_p, queries_p, r, METRIC, use_kdtree=False
+            )
 
-                part = proj_quality.HilbertPartitioner(points_p)
-                all_quality[1, i, j] = part.hyperplane_quality(points_p, r)
-                all_quality[2, i, j] = part.is_query_in_one_partition(queries_p, r)
+            part = proj_quality.HilbertPartitioner(points_p)
+            all_quality[1, i, j] = part.hyperplane_quality(points_p, r)
+            all_quality[2, i, j] = part.is_query_in_one_partition(queries_p, r)
 
-            except:
-                pass
+        if DEBUG:
+            # q = [np.nanmax(qual) for qual in all_quality]
+            # plt.scatter(iters, q[0])
+            # print(iters, q)
+            all_iters.append(iters)
+            all_quals.append([np.nanmax(qual) for qual in all_quality])
+            plt.clf()
+            plt.plot(
+                np.asarray([all_iters] * 3).T,
+                np.asarray(all_quals),
+                label=OPTIMAL_METHODS,
+            )
+            plt.loglog()
+            plt.legend()
+            plt.pause(0.001)
+            plt.show()
 
     for c in range(len(all_quality)):
         quality = all_quality[c]
