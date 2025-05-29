@@ -29,11 +29,11 @@ def run(**config_overwrite):
 
     CONFIG = dict(
         metric=("Euclidean", 2),
-        n_runs=1,
+        n_runs=10,
         n_samples=512,
         n_queries=128,
         dims=list(range(2, 18)),
-        n_cpus=1,
+        n_cpus=-1,
         seed=abs(hash(datetime.now())),
         verbose=False,
     )
