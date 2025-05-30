@@ -27,7 +27,7 @@ def run(**config_overwrite):
 
     CONFIG = dict(
         metric=("Euclidean", 2),
-        n_runs=8,
+        n_runs=3,
         n_samples=512,
         n_queries=128,
         dims=list(range(2, 18)),
@@ -82,9 +82,9 @@ def run(**config_overwrite):
 
     # plan all experiments
     def create_jobs():
-        if len(list(CONFIG["seed"])) > 1:
+        try:
             seed = iter(CONFIG["seed"])
-        else:
+        except TypeError:
             seed = itertools.count(CONFIG["seed"])
         config = frozendict(CONFIG)
 
