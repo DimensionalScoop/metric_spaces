@@ -38,6 +38,16 @@ def merge(pattern, output, dry_run):
         tables = conn.execute("select distinct name from (show all tables)").fetchall()
         tables = [r[0] for r in tables]
 
+        skiplist = []
+        for i in range(len(files)):
+            try:
+                for tab in tables:
+                    conn.execute(f"select * from db{i}.{tab} limit 1")
+            except:
+                skiplist.append(i)
+        if skiplist:
+            print(f"skipping {len(skiplist)} databases because of incomplete tables")
+
         if dry_run:
             click.echo(f"\nWould merge tables {tables} into: {output}")
             return
@@ -46,7 +56,11 @@ def merge(pattern, output, dry_run):
 
         # Merge each table
         for table in tables:
-            unions = [f"SELECT * FROM db{i}.{table}" for i in range(len(files))]
+            unions = [
+                f"SELECT * FROM db{i}.{table}"
+                for i in range(len(files))
+                if i not in skiplist
+            ]
             conn.execute(f"CREATE TABLE {table} AS {' UNION ALL '.join(unions)}")
 
             count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]

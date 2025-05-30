@@ -16,6 +16,7 @@ import json
 import itertools
 import logging
 import line_profiler
+from hashlib import sha1
 
 from meters import pivot_selection
 from meters.generate import point_generator
@@ -69,7 +70,7 @@ def run(
     rv["single_partition_query_share"] = np.nan
     rv["dummy_useful_partition_size"] = np.nan
     rv["dummy_single_partition_query_share"] = np.nan
-    rv["notes"] = "{}"
+    rv["notes"] = dict()
 
     # run experiment
     try:
@@ -88,7 +89,7 @@ def run(
             rv = new_rv
 
     except Exception as e:
-        rv["notes"] = json.dumps(dict(error_type=type(e).__name__, message=str(e)))
+        rv["notes"].update(dict(error_type=type(e).__name__, message=str(e)))
 
         logger.exception(
             "function arguments",
@@ -97,6 +98,12 @@ def run(
         logger.info("CONFIG for above exception", config)
         if RAISE_EXCEPTIONS:
             raise
+
+    try:
+        rv["notes"] = json.dumps(rv["notes"])
+    except TypeError:
+        for single_rv in rv:
+            single_rv["notes"] = json.dumps(single_rv["notes"])
 
     df = pl.DataFrame(rv, schema=SCHEMA, strict=False)
     # polars df isn't serializable yet
@@ -118,10 +125,18 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
     # example queries
     queries = generate_points(rng=rng, dim=dim, n_samples=config["n_queries"])
     r = proj_quality.get_average_k_nn_dist(points, queries, metric, k=10)
+    notes = dict(
+        dataset_hash=(
+            sha1(points.data).hexdigest()
+            + sha1(queries.data).hexdigest()
+            + sha1(r).hexdigest()
+        )
+    )
 
     if algorithm != "optimal":
         p0, p1 = select_pivots(points, rng=rng)
         rv = _project_and_measure(p0, p1, metric, points, queries, r)
+        rv["notes"].update(notes)
         return rv
     else:
         optimize_pivots = select_pivots
@@ -131,6 +146,7 @@ def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -
         ).items():
             result = _project_and_measure(p0, p1, metric, points, queries, r)
             result["algorithm"] = name
+            result["notes"].update(notes)
             all_rvs.append(result)
         return all_rvs
 
@@ -154,4 +170,5 @@ def _project_and_measure(p0, p1, metric, points, queries, r):
     rv["dummy_single_partition_query_share"] = dummy_part.is_query_in_one_partition(
         queries_p, r
     )
+    rv["notes"] = dict()
     return rv

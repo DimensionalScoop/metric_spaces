@@ -24,17 +24,18 @@ OPTIMAL_METHODS = [
 
 def optimize_pivots(points, queries, r, return_full=False, verbose=False) -> dict:
     return {
-        name: points[pivot_idx]
-        for name, pivot_idx in zip(
+        name: pivots
+        for name, pivots in zip(
             OPTIMAL_METHODS,
-            list(_optimize_pivots(points, queries, r, return_full, verbose)),
+            _optimize_pivots(points, queries, r, return_full, verbose),
         )
     }
 
 
 @line_profiler.profile
 def _optimize_pivots(points, queries, r, return_full=False, verbose=True):
-    all_quality = np.nan * np.ones([3, len(points), len(points)], float)
+    # bigger is better
+    all_quality = -np.inf * np.ones([3, len(points), len(points)], float)
 
     if DEBUG:
         all_iters = []
@@ -53,7 +54,7 @@ def _optimize_pivots(points, queries, r, return_full=False, verbose=True):
             points_p = tetrahedron.project_to_2d_euclidean(points, p0, p1, METRIC)
             queries_p = tetrahedron.project_to_2d_euclidean(queries, p0, p1, METRIC)
 
-            all_quality[0, i, j] = proj_quality.candidate_set_size(
+            all_quality[0, i, j] = -proj_quality.candidate_set_size(
                 points_p, queries_p, r, METRIC, use_kdtree=False
             )
 
@@ -78,18 +79,27 @@ def _optimize_pivots(points, queries, r, return_full=False, verbose=True):
             plt.pause(0.001)
             plt.show()
 
-    for c in range(len(all_quality)):
-        quality = all_quality[c]
-        # make symmetric
-        lower_tri = np.tril_indices(quality.shape[0], -1)
-        quality[lower_tri] = quality.T[lower_tri]
+    rv = []
+    for q in all_quality:
+        best_points_idx = np.array(np.unravel_index(np.argmax(q), q.shape))
+        assert best_points_idx[0] != best_points_idx[1]
+        p0, p1 = points[best_points_idx[0]], points[best_points_idx[1]]
+        print(best_points_idx)
+        rv.append((p0, p1))
+    return rv
 
-        quality = __mask_diag(quality)
+    # for c in range(len(all_quality)):
+    #     quality = all_quality[c]
+    #     # make symmetric
+    #     lower_tri = np.tril_indices(quality.shape[0], -1)
+    #     quality[lower_tri] = quality.T[lower_tri]
 
-        if return_full:
-            yield quality
-        else:
-            yield np.array(np.unravel_index(np.argmax(quality), quality.shape))
+    #     quality = __mask_diag(quality)
+
+    #     if return_full:
+    #         yield quality
+    #     else:
+    #         yield np.array(np.unravel_index(np.argmax(quality), quality.shape))
 
 
 def optimize_pivot(points, p0, criterion, rng=None):

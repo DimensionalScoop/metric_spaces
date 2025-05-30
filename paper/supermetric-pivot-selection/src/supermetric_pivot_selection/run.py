@@ -21,15 +21,18 @@ def run(**config_overwrite):
     if config_overwrite is None:
         config_overwrite = dict()
 
-    PATH = f"results/experiment_{datetime.now().isoformat()}"
+    PATH = "results/"
 
     EXPERIMENT_ID = uuid4()
 
     CONFIG = dict(
+        name=f"e_{datetime.now().isoformat().replace(':', '.')}",
         metric=("Euclidean", 2),
         n_runs=3,
-        n_samples=512,
-        n_queries=128,
+        # n_samples=512,
+        # n_queries=128,
+        n_samples=128,
+        n_queries=20,
         dims=list(range(2, 18)),
         n_cpus=-1,
         seed=abs(hash(datetime.now())),
@@ -40,9 +43,9 @@ def run(**config_overwrite):
     CONFIG["machine_mem_GB"] = int(psutil.virtual_memory().total / 1e9)
     CONFIG["machine_cores"] = psutil.cpu_count()
 
-    CONFIG["files"] = PATH
-    CONFIG["dbfile"] = PATH + ".duck"
-    CONFIG["logfile"] = PATH + ".log"
+    CONFIG["files"] = PATH + CONFIG["name"]
+    CONFIG["dbfile"] = PATH + CONFIG["name"] + ".duck"
+    CONFIG["logfile"] = PATH + CONFIG["name"] + ".log"
 
     generators = POINT_GENERATORS
     piv_selectors = pivot_selection.get_selection_algos(True)

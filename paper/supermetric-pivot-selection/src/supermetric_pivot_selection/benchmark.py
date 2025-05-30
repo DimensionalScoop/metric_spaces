@@ -1,4 +1,4 @@
-from run import run
+from supermetric_pivot_selection.run import run
 
 import numpy as np
 from numpy.testing import assert_array_almost_equal
@@ -46,10 +46,12 @@ import line_profiler
 
 run(
     n_runs=1,
-    n_samples=512,
+    # n_samples=512,
+    # n_queries=128,
+    n_samples=128,
     n_queries=128,
     dims=list(range(2, 18)),
-    n_cpus=20,
+    n_cpus=-1,
     # datasets=["gaussian, eliptic"],
     algorithms=["optimal"],
     verbose=True,
