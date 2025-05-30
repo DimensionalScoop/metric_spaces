@@ -103,7 +103,6 @@ def run(
     return df.to_pandas()
 
 
-# @line_profiler.profile
 def _run(seed: int, algorithm: str, dataset_type: str, dim: int, config: dict) -> dict:
     """Actually runs the experiment."""
 
