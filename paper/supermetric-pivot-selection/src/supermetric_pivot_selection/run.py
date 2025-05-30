@@ -22,14 +22,12 @@ def run(**config_overwrite):
         config_overwrite = dict()
 
     PATH = f"results/experiment_{datetime.now().isoformat()}"
-    DB_FILE = PATH + ".duck"
-    LOG_FILE = PATH + ".log"
 
     EXPERIMENT_ID = uuid4()
 
     CONFIG = dict(
         metric=("Euclidean", 2),
-        n_runs=10,
+        n_runs=8,
         n_samples=512,
         n_queries=128,
         dims=list(range(2, 18)),
@@ -43,6 +41,8 @@ def run(**config_overwrite):
     CONFIG["machine_cores"] = psutil.cpu_count()
 
     CONFIG["files"] = PATH
+    CONFIG["dbfile"] = PATH + ".duck"
+    CONFIG["logfile"] = PATH + ".log"
 
     generators = POINT_GENERATORS
     piv_selectors = pivot_selection.get_selection_algos(True)
@@ -51,21 +51,24 @@ def run(**config_overwrite):
     CONFIG.update(config_overwrite)
 
     logging.basicConfig(
-        handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()],
+        handlers=[logging.FileHandler(CONFIG["logfile"]), logging.StreamHandler()],
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     logger = logging.getLogger(__name__)
 
-    db = duckdb.connect(DB_FILE)
-    db.sql("""
-        CREATE SEQUENCE id_sequence START 1;
-        CREATE TABLE IF NOT EXISTS experiments (
-            id UUID PRIMARY KEY DEFAULT uuid(),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            config json
-            )
-    """)
+    db = duckdb.connect(CONFIG["dbfile"])
+    try:
+        db.sql("""
+            CREATE SEQUENCE id_sequence START 1;
+            CREATE TABLE IF NOT EXISTS experiments (
+                id UUID PRIMARY KEY DEFAULT uuid(),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                config json
+                )
+        """)
+    except duckdb.CatalogException:
+        logger.info("using existing db scheme")
     db.execute(
         "INSERT INTO experiments (id, config) VALUES (?, ?)",
         [EXPERIMENT_ID, json.dumps(CONFIG)],
@@ -79,14 +82,22 @@ def run(**config_overwrite):
 
     # plan all experiments
     def create_jobs():
-        seed = itertools.count(CONFIG["seed"])
+        if len(list(CONFIG["seed"])) > 1:
+            seed = iter(CONFIG["seed"])
+        else:
+            seed = itertools.count(CONFIG["seed"])
         config = frozendict(CONFIG)
-        for _ in range(CONFIG["n_runs"]):
-            for algorithm in CONFIG["algorithms"]:
+
+        try:
+            for _ in range(CONFIG["n_runs"]):
                 for dataset_type in CONFIG["datasets"]:
                     for dim in CONFIG["dims"]:
-                        params = (next(seed), algorithm, dataset_type, dim, config)
-                        yield delayed(experiment.run)(*params)
+                        this_seed = next(seed)  # use the same seed for all algorithms
+                        for algorithm in CONFIG["algorithms"]:
+                            params = (this_seed, algorithm, dataset_type, dim, config)
+                            yield delayed(experiment.run)(*params)
+        except StopIteration:
+            pass  # seed list ran out; that's okay!
 
     jobs = list(create_jobs())
 
