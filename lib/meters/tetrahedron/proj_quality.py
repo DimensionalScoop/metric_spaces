@@ -7,12 +7,20 @@ from typing import *
 import numpy as np
 from sklearn import decomposition
 from sklearn.neighbors import KDTree
+from sklearn import config_context
+from sklearn.utils._array_api import get_namespace
 import scipy
 from sympy.series import order
 
 import line_profiler
 
 from ..metric.metric import Metric, Euclid
+
+
+def _faster_transform(pca, X):
+    with config_context(assume_finite=True, skip_parameter_validation=True):
+        xp, _ = get_namespace(X, pca.components_, pca.explained_variance_)
+        return pca._transform(X, xp=xp, x_is_centered=False)
 
 
 @line_profiler.profile
@@ -91,6 +99,7 @@ class HilbertPartitioner:
                 self.pca = decomposition.PCA(
                     n_components=1
                 )  # , svd_solver='randomized')
+                # this takes a lot of time because sklearn validates the arrays
                 projection = self.pca.fit_transform(points)
             except ValueError:
                 return
@@ -123,7 +132,7 @@ class HilbertPartitioner:
         `queries` should have the shape [number of queries, dimensionality]."""
 
         try:
-            projection = self.pca.transform(queries)
+            projection = _faster_transform(self.pca, queries)
             distance_to_border = np.abs(projection - self.hyperplane)
             n_far_away = (distance_to_border > r).sum()
             return n_far_away / len(queries)
@@ -133,7 +142,7 @@ class HilbertPartitioner:
     def get_partitions(self, points, r):
         """Return point indices that are in the (left, right) partition and further
         away from the boundary than `r`."""
-        projection = self.pca.transform(points).flatten()
+        projection = _faster_transform(self.pca, points).flatten()
         assert len(projection) == len(points)
         mid = self.hyperplane
         left = np.argwhere(projection < mid - r).flatten()
