@@ -4,6 +4,7 @@ from ctypes import ArgumentError
 import numpy as np
 from scipy import spatial
 import numexpr
+import line_profiler
 
 from . import fast_distance_matrix
 
@@ -53,6 +54,9 @@ class Metric:
                     result[:, j] = self(x, y[j])
             return result
 
+        def count_query_hits(self, points, queries, r):
+            raise NotImplementedError()
+
 
 class ProbMetric(Metric):
     """A metric that compares two probability distributions
@@ -90,13 +94,17 @@ class Euclid(Metric):
 
     def _calc_distance(self, a: np.ndarray, b: np.ndarray, is_list: bool) -> np.array:
         n_axis = max((len(a.shape), len(b.shape)))
+        # return np.sqrt(np.sum((a-b)**2, axis=n_axis-1))
         return np.sqrt(numexpr.evaluate(_NUMEXPR_EUCLID[n_axis - 1]))
 
     def distance_matrix(self, a, b, threshold=1000000, rank_only=False):
         if a is not b:
-            return super().distance_matrix(a, b)
+            return fast_distance_matrix.euclidean_distance_matrix(a, b)
         else:
             return fast_distance_matrix.euclid(a)
+
+    def count_query_hits(self, points, queries, r):
+        return fast_distance_matrix.euclidean_range_query_hits(points, queries, r)
 
 
 class PNorm(Metric):
