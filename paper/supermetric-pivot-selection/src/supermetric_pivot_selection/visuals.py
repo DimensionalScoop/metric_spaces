@@ -28,6 +28,30 @@ import seaborn as sns
 # #%config InlineBackend.figure_formats = ['svg']
 
 # %%
+# renaming from code names to paper names
+rename_map = {
+    # dataset
+    # just a wrong word
+    "univariate, idd": "uniform, idd",
+    "univariate, stretched": "uniform, stretched",
+    # algorithms
+    "maximize_dist": "max distance",
+    "non_central_points": "max var",
+    "non_central_points_approx": "max variance",
+    "different_cluster_centers": "different cluster centers",
+    "IS_pto_1.5": "max Ptolemy LB",
+    "IS_tri_1.5": "ma triangle LB",
+    "random": "random",
+    "optimal_candidate_set_size": "optimal $n_C$",
+    "optimal_hyperplane_quality": "optimal $n_P$",
+    "optimal_partition_usability": "optimal $n_U$",
+    # unused
+    "approx_Ptolemy_IS": "Ptolemy IS approx",
+    "approx_cheap_Ptolemy_IS": "Ptolemy IS approx cheap",
+    "approx_triangle_IS": "Triangle IS approx",
+}
+
+# %%
 merge_cols = ("seed", "dataset_supertype", "dataset_subtype", "dim")
 dim_cols = ("dataset_supertype", "dataset_subtype", "dim")
 measure_cols = (
@@ -37,11 +61,18 @@ measure_cols = (
     "dummy_useful_partition_size",
     "dummy_single_partition_query_share",
 )
-important_algs = ("random", "optimal_candidate_set_size")
-important_algs = (
-    "random",
+
+optimal_algs = (
     "optimal_candidate_set_size",
-    "maximize_dist",
+    "optimal_partition_usability",
+    "optimal_hyperplane_quality",
+)
+references_algs = ("random", *optimal_algs)
+
+important_algs = (
+    *references_algs,
+    "non_central_points_approx",
+    "gnat_dist",
     "remoteness",
     "IS_tri_1.5",
     "IS_pto_1.5",
@@ -332,7 +363,7 @@ for metric in metrics:
     ]
 
     grid = sns.FacetGrid(
-        data=df_rel.filter(pl.col("algorithm").is_in(algs)),
+        data=df_rel,  # .filter(pl.col("algorithm").is_in(algs)),
         col="dataset",
         # row_wrap=2,
         # row="dataset_subtype",
@@ -364,10 +395,15 @@ for metric in metrics:
     plt.show()
 
 # %%
+df.group_by("algorithm").agg(pl.col("avoided_dist_calcs").mean()).sort(
+    "avoided_dist_calcs"
+).to_pandas()
+
+# %%
 metrics = [
-    "avoided_dist_calcs_abs",
-    "single_partition_query_share_abs",
-    "useful_partition_size_abs",
+    "avoided_dist_calcs_bench",
+    "single_partition_query_share_bench",
+    "useful_partition_size_bench",
 ]
 # metrics = ["avoided_dist_calcs" ,"single_partition_query_share", "useful_partition_size"]
 
@@ -378,7 +414,7 @@ for metric in metrics:
     ]
 
     grid = sns.FacetGrid(
-        data=df_rel.filter(pl.col("algorithm").is_in(algs)),
+        data=df_rel,  # .filter(pl.col("algorithm").is_in(algs)),
         col="dataset",
         # row_wrap=2,
         # row="dataset_subtype",
@@ -418,10 +454,7 @@ metrics = [
 # metrics = ["avoided_dist_calcs" ,"single_partition_query_share", "useful_partition_size"]
 
 for metric in metrics:
-    algs = list(important_algs) + [
-        "optimal_partition_usability",
-        "optimal_hyperplane_quality",
-    ]
+    algs = list(important_algs)
 
     grid = sns.FacetGrid(
         data=df_rel.filter(pl.col("algorithm").is_in(algs)),
