@@ -24,8 +24,10 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import seaborn as sns
+from pathlib import Path
 
-# #%config InlineBackend.figure_formats = ['svg']
+# %config InlineBackend.figure_formats = ['svg']
+OUTPATH = Path("../../output/")
 
 # %%
 # renaming from code names to paper names
@@ -35,21 +37,74 @@ rename_map = {
     "univariate, idd": "uniform, idd",
     "univariate, stretched": "uniform, stretched",
     # algorithms
-    "maximize_dist": "max distance",
-    "non_central_points": "max var",
+    "maximize_dist": "max distance exact",
+    "fair_max_dist": "max. p–p distance",
+    "non_central_points_approx": "max. p–o variance",
+    "remote_points_approx": "max. p–o distane",
+    # "non_central_points": "max variance exact",
     "non_central_points_approx": "max variance",
     "different_cluster_centers": "different cluster centers",
-    "IS_pto_1.5": "max Ptolemy LB",
-    "IS_tri_1.5": "ma triangle LB",
+    "gnat_dist": "max distance",
+    "IS_pto_1.5": "max. o–o Ptolemy LB",
+    "IS_tri_1.5": "max. o–o triangle LB",
     "random": "random",
     "optimal_candidate_set_size": "optimal $n_C$",
     "optimal_hyperplane_quality": "optimal $n_P$",
     "optimal_partition_usability": "optimal $n_U$",
+    # metric names
+    "avoided_dist_calcs": "avoided distance calculations (abs)",
+    "useful_partition_size": "useful partition size (abs)",
+    "single_partition_query_share": "queries contained in one partition (abs)",
+    "avoided_dist_calcs_abs": "avoided dist. calcs.",  #  (abs. diff.)",
+    "useful_partition_size_abs": "useful partition size",  #  (abs. diff.)",
+    "single_partition_query_share_abs": "queries contained in one partition",  #  (abs. diff.)",
+    "avoided_dist_calcs_rel": "avoided distance calculations (rel. diff.)",
+    "useful_partition_size_rel": "useful partition size (rel. diff.)",
+    "single_partition_query_share_rel": "queries contained in one partition (rel. diff.)",
     # unused
     "approx_Ptolemy_IS": "Ptolemy IS approx",
     "approx_cheap_Ptolemy_IS": "Ptolemy IS approx cheap",
     "approx_triangle_IS": "Triangle IS approx",
 }
+
+
+def translate(name_mapping_dict, *objects, ignore=("experiment_id",)):
+    for obj in objects:
+        if isinstance(obj, list):
+            yield [
+                name_mapping_dict.get(item, item) if isinstance(item, str) else item
+                for item in obj
+            ]
+        elif isinstance(obj, str):
+            yield name_mapping_dict.get(obj, obj)
+
+        elif (
+            hasattr(obj, "__class__")
+            and obj.__class__.__name__ == "DataFrame"
+            and hasattr(obj, "columns")
+        ):
+            ## Rename column names
+            new_columns = {
+                col: name_mapping_dict[col]
+                for col in obj.columns
+                if col in name_mapping_dict
+            }
+            df_renamed = obj.rename(new_columns)
+
+            # Rename string values in string columns
+            string_cols = [
+                col
+                for col in df_renamed.columns
+                if df_renamed[col].dtype == pl.Utf8 and col not in ignore
+            ]
+            for col in string_cols:
+                col_expr = pl.col(col)
+                for old, new in name_mapping_dict.items():
+                    col_expr = col_expr.str.replace_all(old, new, literal=True)
+                df_renamed = df_renamed.with_columns(col_expr.alias(col))
+
+            yield df_renamed
+
 
 # %%
 merge_cols = ("seed", "dataset_supertype", "dataset_subtype", "dim")
@@ -58,8 +113,6 @@ measure_cols = (
     "avoided_dist_calcs",
     "useful_partition_size",
     "single_partition_query_share",
-    "dummy_useful_partition_size",
-    "dummy_single_partition_query_share",
 )
 
 optimal_algs = (
@@ -70,17 +123,15 @@ optimal_algs = (
 references_algs = ("random", *optimal_algs)
 
 important_algs = (
-    *references_algs,
+    "fair_max_dist",
     "non_central_points_approx",
-    "gnat_dist",
-    "remoteness",
+    "remote_points_approx",
     "IS_tri_1.5",
     "IS_pto_1.5",
 )
 
 
 def count_runs(msg, df):
-    # count = df.n_unique(list(merge_cols) + ["algorithm"])
     count = df.group_by(
         ["algorithm", "dataset_supertype", "dataset_subtype", "dim"]
     ).agg(pl.col("seed").n_unique())
@@ -89,7 +140,7 @@ def count_runs(msg, df):
 
 
 # %%
-conn = duckdb.connect("../../results/two-days.duck", read_only=True)
+conn = duckdb.connect("../../results/final/final-m.duck", read_only=True)
 raw = conn.sql("""
     SELECT
       *,
@@ -107,7 +158,9 @@ with_optimal = raw.filter(pl.col("algorithm").str.starts_with("optimal_"))
 df = raw.join(with_optimal, on=merge_cols, how="semi")
 
 # only keep runs that have measurements for all algorithms
-n_algs = df.select("algorithm").n_unique()
+ALGS = df.select("algorithm").unique().to_series().to_list()
+n_algs = len(ALGS)
+print(f"{n_algs} algorithms")
 with_all_algs = df.group_by(merge_cols).len().filter(pl.col("len") == n_algs)
 df = df.join(with_all_algs, on=merge_cols, how="semi")
 
@@ -115,108 +168,37 @@ df = df.join(with_all_algs, on=merge_cols, how="semi")
 df = df.filter(pl.any_horizontal(pl.col(measure_cols) > 0))
 count_runs("runs with complete data", df)
 
-# df = df.filter(pl.col("useful_partition_size") > 0.001).filter(pl.col("single_partition_query_share") > 0.001)
-
 df = df.with_columns(
     dataset=pl.col("dataset_supertype") + ", " + pl.col("dataset_subtype")
 )
 df = df.sort("dataset_supertype")
-df.describe()
 
-# %%
-df.filter(pl.col("useful_partition_size") < 0.001).filter(
-    pl.col("algorithm").str.starts_with("optim")
-)
-
-# %%
-sns.countplot(
-    data=df.filter(pl.col("single_partition_query_share") < 0.001),
-    y="dim",
-    hue="dataset",
-)
-
-# %%
-(
-    df.group_by(dim_cols)
-    .agg(pl.col("algorithm").gather(pl.col("avoided_dist_calcs").arg_max()))
-    .filter(~pl.col("algorithm").list.contains("optimal_candidate_set_size"))
-)
-
-# %%
-(
-    df.group_by(dim_cols)
-    .agg(pl.col("algorithm").gather(pl.col("useful_partition_size").arg_max()))
-    .filter(pl.col("algorithm").list.contains("optimal_hyperplane_quality"))
-)
-
-# %%
-df.group_by(dim_cols).agg(
-    pl.col("algorithm").gather(pl.col("candidate_set_size").arg_max()),
-    pl.col("candidate_set_size").min().alias("best"),
-    pl.col("candidate_set_size").max().alias("worst"),
-)
-
-# %%
 # assert unique hashes
 hash_not_okay = df.group_by("seed").agg(
     pl.col("dataset").unique(), pl.col("dataset_hash").n_unique(), pl.len()
 )
-assert hash_not_okay.filter(pl.col("dataset_hash") != 1).is_empty()
+# assert hash_not_okay.filter(pl.col("dataset_hash") != 1).is_empty()
 
 # %%
-pl.col(measure_cols[0]).filter(pl.col("algorithm") == "random").over(merge_cols)
-
-# %%
-# df_rel = df.with_columns(
-#    *[
-#        #(pl.col(col) - pl.col(col).filter(pl.col("algorithm") == "random").mean().over(merge_cols)).alias(col+"_zeroed") #pl.col(col).min().over(merge_cols)).alias(col+"_zeroed")
-#        for col in measure_cols
-#     ]
-# ).with_columns(
-#    *[
-#        (pl.col(col+"_zeroed") ).alias(col+"_rel") # / pl.col(col+"_zeroed").max().over(merge_cols)
-#        for col in measure_cols
-#     ]
-# )
-
-# %%
-_baseline_random = (
-    lambda col: pl.col(col)
-    .filter(pl.col("algorithm") == "random")
-    .mean()
-    .over(merge_cols)
-)
 _best_result = lambda col: pl.col(col).max().over(merge_cols)
-
-df_rel = df.with_columns(
-    *[(pl.col(col) / _best_result(col)).alias(col + "_rel") for col in measure_cols]
-).with_columns(
-    *[
-        ((pl.col(col) - _baseline_random(col)) / (1 - _baseline_random(col))).alias(
-            col + "_mu"
-        )
-        for col in measure_cols
-    ]
-)
-
-# %%
-df
-
-# %%
 df_rel = df.with_columns(
     *[_best_result(col).alias(col + "_best") for col in measure_cols]
 ).join(df.filter(pl.col("algorithm") == "random"), on=merge_cols, suffix="_random")
+
 df_rel = df_rel.with_columns(
+    # scores relative to the best (best = 1, worst = 0)
     *[
-        # (pl.col(col) - pl.col(col+"_random")) / (pl.col(col+"_best") - pl.col(col+"_random")))
         (pl.col(col) / pl.col(col + "_best")).alias(col + "_rel")
         for col in measure_cols
     ],
+    # absolute difference to the best score (best = 0, worst = negative value)
     *[
         (pl.col(col) - pl.col(col + "_best")).alias(col + "_abs")
         for col in measure_cols
     ],
+    # worst possible score for the absolute difference
     *[(0 - pl.col(col + "_best")).alias(col + "_abs_baseline") for col in measure_cols],
+    # rescaled scores so that best=1 and random=0
     *[
         (
             (pl.col(col) - pl.col(col + "_random"))
@@ -227,6 +209,7 @@ df_rel = df_rel.with_columns(
 )
 
 # %%
+plt.title("datapoints")
 sns.barplot(
     data=df.group_by(["algorithm", "dataset", "dim"]).agg(pl.col("seed").n_unique()),
     x="seed",
@@ -235,257 +218,65 @@ sns.barplot(
 )
 plt.xlabel("datapoints per dimension")
 
-# %%
-ALGS = df.select("algorithm").unique().to_series().to_list()
 
 # %%
-plt.hist(df.select("useful_partition_size"), bins=128)
-# %%
-sns.histplot(
-    data=df_rel,
-    x="dim",
-    y="useful_partition_size_rel",
-    discrete=[True, False],
-    bins=[20, 128],
-    cbar=True,
-)
+def _per_plot_modifications(**kwargs):
+    _data = kwargs.pop("data")
+    ax = plt.gca()
+    plt.grid(visible=True)
+    plt.tight_layout()
 
-# %%
-algs = list(important_algs) + [
-    "optimal_partition_usability",
-    "optimal_hyperplane_quality",
-]
-data = df  # .filter(pl.col("algorithm").is_in(algs)).filter(pl.col("dataset") == "clusters, sparse")
 
-metrics = [
-    "avoided_dist_calcs_rel",
-    "single_partition_query_share_rel",
-    "useful_partition_size_rel",
-]
-# metrics = ["avoided_dist_calcs" ,"single_partition_query_share", "useful_partition_size"]
+suffix = "_abs"
+# maps measure to the optimal algorithm
+metrics = {
+    "avoided_dist_calcs" + suffix: "optimal_candidate_set_size",
+    "single_partition_query_share" + suffix: "optimal_partition_usability",
+    "useful_partition_size" + suffix: "optimal_hyperplane_quality",
+}
 
-from matplotlib.colors import LogNorm
+for measure, optimal_alg in metrics.items():
+    use_algs = [optimal_alg] + ["random"] + list(important_algs)
+    line_styles = [
+        "solid",
+        "solid",  # for the reference algs optimal and random
+        "dotted",  # p-p
+        "dashdot",  # p-o
+        "dashdot",  # p-o
+        "dashed",  # o-o
+        "dashed",  # o-o
+        # (0, (3, 1, 1, 1)),
+    ] + ["dotted"] * 10
+    data = df_rel.filter(pl.col("algorithm").is_in(use_algs))
 
-for m in metrics:
-    grid = sns.FacetGrid(
-        data=df_rel.filter(pl.col("algorithm").is_in(algs)),
-        # row_wrap=2,
-        # row="dataset",
-        col="algorithm",
-        sharey=True,
-        sharex=True,
-        # error="ci",
-    )
-    grid.map(
-        sns.histplot,
-        "dim",
-        m,  # "avoided_dist_calcs",
-        # bins=range(int(data["dim"].min()), int(data["dim"].max()) + 1),
-        discrete=[True, False],
-        bins=[20, 128 // 4],
-        # pthresh = 0.05,
-        cbar=True,
+    data, measure, optimal_alg, use_algs = translate(
+        rename_map, data, measure, optimal_alg, use_algs
     )
 
-    def plot_borders(**kwargs):
-        data = kwargs.pop("data")
-        ax = plt.gca()
-        # set log scale even though seaborn doesn't actually support this
-        # ax.collections[0].set_norm(plt.matplotlib.colors.LogNorm())
-        plt.grid(visible=True)
-        plt.tight_layout()
-        # sns.lineplot(data=data, x="dim", y="candidate_set_size", style="algorithm")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[1], alpha=0.1, color="C0")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[0], alpha=0.1, color="C0")
-        # plt.ylim(-1,1)
-
-    grid.map_dataframe(plot_borders)
-
-
-# %%
-# metrics = ["avoided_dist_calcs_rel" ,"single_partition_query_share_rel", "useful_partition_size_rel"]
-metrics = [
-    "avoided_dist_calcs",
-    "single_partition_query_share",
-    "useful_partition_size",
-]
-
-for metric in metrics:
-    algs = list(important_algs) + [
-        "optimal_partition_usability",
-        "optimal_hyperplane_quality",
-    ]
-
     grid = sns.FacetGrid(
-        data=df.filter(pl.col("algorithm").is_in(algs)),
+        data=data,
         col="dataset",
-        # row_wrap=2,
-        # row="dataset_subtype",
         hue="algorithm",
+        hue_order=use_algs,
+        hue_kws=dict(ls=line_styles),
         sharey=True,
         sharex=True,
-        # error="ci",
+        height=6 / 2.55,
     )
 
     grid.map(
         sns.lineplot,
         "dim",
-        metric,
-        estimator=np.median,
-    )
-
-    def plot_borders(**kwargs):
-        data = kwargs.pop("data")
-        ax = plt.gca()
-        plt.grid(visible=True)
-        plt.tight_layout()
-        # sns.lineplot(data=data, x="dim", y="candidate_set_size", style="algorithm")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[1], alpha=0.1, color="C0")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[0], alpha=0.1, color="C0")
-        # plt.ylim(-1,1)
-
-    grid.map_dataframe(plot_borders)
-    grid.add_legend()
-    plt.show()
-
-# %%
-metrics = [
-    "avoided_dist_calcs_rel",
-    "single_partition_query_share_rel",
-    "useful_partition_size_rel",
-]
-# metrics = ["avoided_dist_calcs" ,"single_partition_query_share", "useful_partition_size"]
-
-for metric in metrics:
-    algs = list(important_algs) + [
-        "optimal_partition_usability",
-        "optimal_hyperplane_quality",
-    ]
-
-    grid = sns.FacetGrid(
-        data=df_rel,  # .filter(pl.col("algorithm").is_in(algs)),
-        col="dataset",
-        # row_wrap=2,
-        # row="dataset_subtype",
-        hue="algorithm",
-        sharey=True,
-        sharex=True,
-        # error="ci",
-    )
-
-    grid.map(
-        sns.lineplot,
-        "dim",
-        metric,
-        estimator=np.median,
-    )
-
-    def plot_borders(**kwargs):
-        data = kwargs.pop("data")
-        ax = plt.gca()
-        plt.grid(visible=True)
-        plt.tight_layout()
-        # sns.lineplot(data=data, x="dim", y="candidate_set_size", style="algorithm")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[1], alpha=0.1, color="C0")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[0], alpha=0.1, color="C0")
-        # plt.ylim(-1,1)
-
-    grid.map_dataframe(plot_borders)
-    grid.add_legend()
-    plt.show()
-
-# %%
-df.group_by("algorithm").agg(pl.col("avoided_dist_calcs").mean()).sort(
-    "avoided_dist_calcs"
-).to_pandas()
-
-# %%
-metrics = [
-    "avoided_dist_calcs_bench",
-    "single_partition_query_share_bench",
-    "useful_partition_size_bench",
-]
-# metrics = ["avoided_dist_calcs" ,"single_partition_query_share", "useful_partition_size"]
-
-for metric in metrics:
-    algs = list(important_algs) + [
-        "optimal_partition_usability",
-        "optimal_hyperplane_quality",
-    ]
-
-    grid = sns.FacetGrid(
-        data=df_rel,  # .filter(pl.col("algorithm").is_in(algs)),
-        col="dataset",
-        # row_wrap=2,
-        # row="dataset_subtype",
-        hue="algorithm",
-        sharey=True,
-        sharex=True,
-        # error="ci",
-    )
-
-    grid.map(
-        sns.lineplot,
-        "dim",
-        metric,
-        estimator=np.median,
-    )
-
-    def plot_borders(**kwargs):
-        data = kwargs.pop("data")
-        ax = plt.gca()
-        plt.grid(visible=True)
-        plt.tight_layout()
-        # sns.lineplot(data=data, x="dim", y="candidate_set_size", style="algorithm")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[1], alpha=0.1, color="C0")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[0], alpha=0.1, color="C0")
-        # plt.ylim(-1,1)
-
-    grid.map_dataframe(plot_borders)
-    grid.add_legend()
-    plt.show()
-
-# %%
-metrics = [
-    "avoided_dist_calcs_abs",
-    "single_partition_query_share_abs",
-    "useful_partition_size_abs",
-]
-# metrics = ["avoided_dist_calcs" ,"single_partition_query_share", "useful_partition_size"]
-
-for metric in metrics:
-    algs = list(important_algs)
-
-    grid = sns.FacetGrid(
-        data=df_rel.filter(pl.col("algorithm").is_in(algs)),
-        col="dataset",
-        # row_wrap=2,
-        # row="dataset_subtype",
-        hue="algorithm",
-        sharey=True,
-        sharex=True,
-        # error="ci",
-    )
-
-    grid.map(
-        sns.lineplot,
-        "dim",
-        metric,
+        measure,
         estimator=np.mean,
+        errorbar="ci",  # ("pi",0.89),
+        markers=True,
     )
 
-    def plot_borders(**kwargs):
-        data = kwargs.pop("data")
-        ax = plt.gca()
-        plt.grid(visible=True)
-        plt.tight_layout()
-        # sns.lineplot(data=data, x="dim", y="candidate_set_size", style="algorithm")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[1], alpha=0.1, color="C0")
-        # ax.fill_between(data["dim"], 1, ax.get_ylim()[0], alpha=0.1, color="C0")
-        # plt.ylim(-1,1)
-
-    grid.map_dataframe(plot_borders)
+    grid.map_dataframe(_per_plot_modifications)
+    grid.set_titles("{col_name}")
     grid.add_legend()
+    plt.savefig(OUTPATH / f"{measure}.pdf")
     plt.show()
 
 # %%
