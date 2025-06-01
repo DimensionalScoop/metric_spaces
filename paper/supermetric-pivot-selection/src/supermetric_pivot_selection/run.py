@@ -17,7 +17,7 @@ from meters import pivot_selection
 from meters.generate.point_generator import GENERATORS as POINT_GENERATORS
 
 
-def run(**config_overwrite):
+def run(job_creator=None, **config_overwrite):
     if config_overwrite is None:
         config_overwrite = dict()
 
@@ -102,7 +102,14 @@ def run(**config_overwrite):
         except StopIteration:
             pass  # seed list ran out; that's okay!
 
-    jobs = list(create_jobs())
+    if not job_creator:
+        jobs = list(create_jobs())
+    else:
+        config = frozendict(CONFIG)
+        jobs = [
+            delayed(experiment.run)(seed, algorithm, dataset_type, dim, config)
+            for dataset_type, dim, seed, algorithm in job_creator
+        ]
 
     # actually run them
     with parallel_config(backend="loky", inner_max_num_threads=2):
