@@ -35,14 +35,15 @@ rename_map = {
     # dataset
     # just a wrong word
     "univariate, idd": "uniform, idd",
+    "gaussian, eliptic": "gaussian, elliptic",
     "univariate, stretched": "uniform, stretched",
     # algorithms
     "maximize_dist": "max distance exact",
     "fair_max_dist": "max. p–p distance",
     "non_central_points_approx": "max. p–o variance",
-    "remote_points_approx": "max. p–o distane",
+    "remote_points_approx": "max. p–o distance",
     # "non_central_points": "max variance exact",
-    "non_central_points_approx": "max variance",
+    "non_central_points_approx": "max. p–o variance",
     "different_cluster_centers": "different cluster centers",
     "gnat_dist": "max distance",
     "IS_pto_1.5": "max. o–o Ptolemy LB",
@@ -252,10 +253,19 @@ for measure, optimal_alg in metrics.items():
     data, measure, optimal_alg, use_algs = translate(
         rename_map, data, measure, optimal_alg, use_algs
     )
+    col_order = [
+        "gaussian, circular",
+        "gaussian, elliptic",
+        "uniform, idd",
+        "uniform, stretched",
+        "clusters, overlapping",
+        "clusters, sparse",
+    ]
 
     grid = sns.FacetGrid(
         data=data,
         col="dataset",
+        col_order=col_order,
         hue="algorithm",
         hue_order=use_algs,
         hue_kws=dict(ls=line_styles),
@@ -269,6 +279,76 @@ for measure, optimal_alg in metrics.items():
         "dim",
         measure,
         estimator=np.mean,
+        errorbar="ci",  # ("pi",0.89),
+        markers=True,
+    )
+
+    grid.map_dataframe(_per_plot_modifications)
+    grid.set_titles("{col_name}")
+    grid.add_legend()
+    plt.savefig(OUTPATH / f"{measure}.pdf")
+    plt.show()
+
+
+# %%
+def _per_plot_modifications(**kwargs):
+    _data = kwargs.pop("data")
+    ax = plt.gca()
+    plt.grid(visible=True)
+    plt.tight_layout()
+
+
+suffix = ""
+# maps measure to the optimal algorithm
+metrics = {
+    "avoided_dist_calcs" + suffix: "optimal_candidate_set_size",
+    "single_partition_query_share" + suffix: "optimal_partition_usability",
+    "useful_partition_size" + suffix: "optimal_hyperplane_quality",
+}
+
+for measure, optimal_alg in metrics.items():
+    use_algs = [optimal_alg] + ["random"] + list(important_algs)
+    line_styles = [
+        "solid",
+        "solid",  # for the reference algs optimal and random
+        "dotted",  # p-p
+        "dashdot",  # p-o
+        "dashdot",  # p-o
+        "dashed",  # o-o
+        "dashed",  # o-o
+        # (0, (3, 1, 1, 1)),
+    ] + ["dotted"] * 10
+    data = df_rel.filter(pl.col("algorithm").is_in(use_algs))
+
+    data, measure, optimal_alg, use_algs = translate(
+        rename_map, data, measure, optimal_alg, use_algs
+    )
+    col_order = [
+        "gaussian, circular",
+        "gaussian, elliptic",
+        "uniform, idd",
+        "uniform, stretched",
+        "clusters, overlapping",
+        "clusters, sparse",
+    ]
+
+    grid = sns.FacetGrid(
+        data=data,
+        col="dataset",
+        col_order=col_order,
+        hue="algorithm",
+        hue_order=use_algs,
+        hue_kws=dict(ls=line_styles),
+        sharey=True,
+        sharex=True,
+        height=6 / 2.55,
+    )
+
+    grid.map(
+        sns.lineplot,
+        "dim",
+        measure,
+        estimator=np.median,
         errorbar="ci",  # ("pi",0.89),
         markers=True,
     )
